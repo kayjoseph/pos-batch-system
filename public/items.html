@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Items - POS Batch System</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<nav>
+    <a href="items.html">Items</a>
+    <a href="purchase.html">Purchase</a>
+    <a href="pos.html">POS</a>
+    <a href="sales.html">Sales</a>
+</nav>
+<div class="container">
+    <h1>Items</h1>
+
+    <div class="card">
+        <h2 style="font-size:15px; margin-top:0;">Add New Item</h2>
+        <div class="form-row">
+            <label>Name</label><input id="name" placeholder="e.g. Paracetamol 500mg">
+        </div>
+        <div class="form-row">
+            <label>SKU</label><input id="sku" placeholder="optional">
+        </div>
+        <div class="form-row">
+            <label>Category</label><input id="category" placeholder="optional">
+        </div>
+        <button onclick="createItem()">Save Item</button>
+    </div>
+
+    <table>
+        <thead>
+            <tr><th>Name</th><th>SKU</th><th>Category</th><th>Total Stock</th><th>Actions</th></tr>
+        </thead>
+        <tbody id="itemsBody"></tbody>
+    </table>
+</div>
+<div id="toast"></div>
+<script src="js/common.js"></script>
+<script>
+async function loadItems() {
+    const items = await api('/items');
+    const body = document.getElementById('itemsBody');
+    body.innerHTML = items.map(i => `
+        <tr>
+            <td>${i.name}</td>
+            <td>${i.sku || '-'}</td>
+            <td>${i.category || '-'}</td>
+            <td>${i.total_stock}</td>
+            <td>
+                <button class="secondary" onclick="location.href='batches.html?item_id=${i.item_id}&name=${encodeURIComponent(i.name)}'">View Batches</button>
+                <button class="danger" onclick="deleteItem(${i.item_id})">Delete</button>
+            </td>
+        </tr>
+    `).join('');
+}
+
+async function createItem() {
+    const name = document.getElementById('name').value.trim();
+    const sku = document.getElementById('sku').value.trim();
+    const category = document.getElementById('category').value.trim();
+    if (!name) return toast('Item name is required');
+    try {
+        await api('/items', { method: 'POST', body: JSON.stringify({ name, sku, category }) });
+        document.getElementById('name').value = '';
+        document.getElementById('sku').value = '';
+        document.getElementById('category').value = '';
+        toast('Item created');
+        loadItems();
+    } catch (err) {
+        toast(err.message);
+    }
+}
+
+async function deleteItem(id) {
+    if (!confirm('Delete this item?')) return;
+    try {
+        await api(`/items/${id}`, { method: 'DELETE' });
+        toast('Item deleted');
+        loadItems();
+    } catch (err) {
+        toast(err.message);
+    }
+}
+
+loadItems();
+</script>
+</body>
+</html>

@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Batch Details - POS Batch System</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<nav>
+    <a href="items.html">Items</a>
+    <a href="purchase.html">Purchase</a>
+    <a href="pos.html">POS</a>
+    <a href="sales.html">Sales</a>
+</nav>
+<div class="container">
+    <h1 id="pageTitle">Batches</h1>
+    <p><a href="items.html">&larr; Back to Items</a></p>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Batch Ref No.</th><th>Expiry Date</th><th>Selling Price</th>
+                <th>Qty In</th><th>Qty Remaining</th><th>Received</th><th>Actions</th>
+            </tr>
+        </thead>
+        <tbody id="batchesBody"></tbody>
+    </table>
+</div>
+<div id="toast"></div>
+<script src="js/common.js"></script>
+<script>
+const params = new URLSearchParams(location.search);
+const itemId = params.get('item_id');
+const itemName = params.get('name') || 'Item';
+document.getElementById('pageTitle').textContent = `Batches - ${itemName}`;
+
+async function loadBatches() {
+    const batches = await api(`/batches/item/${itemId}`);
+    const body = document.getElementById('batchesBody');
+    body.innerHTML = batches.map(b => `
+        <tr>
+            <td><input value="${b.batch_ref_no}" id="ref-${b.batch_id}" style="width:100px"></td>
+            <td class="${expiryClass(b.expiry_date)}">
+                <input type="date" value="${b.expiry_date ? b.expiry_date.substring(0,10) : ''}" id="exp-${b.batch_id}">
+            </td>
+            <td><input type="number" step="0.01" value="${b.selling_price}" id="sp-${b.batch_id}" style="width:90px"></td>
+            <td>${b.qty_in}</td>
+            <td>${b.qty_remaining}</td>
+            <td>${new Date(b.date_received).toLocaleDateString()}</td>
+            <td>
+                <button onclick="saveBatch(${b.batch_id})">Save</button>
+                <button class="secondary" onclick="adjustStock(${b.batch_id}, ${b.qty_remaining})">Adjust Stock</button>
+            </td>
+        </tr>
+    `).join('') || '<tr><td colspan="7">No batches recorded yet for this item.</td></tr>';
+}
+
+async function saveBatch(batchId) {
+    const batch_ref_no = document.getElementById(`ref-${batchId}`).value.trim();
+    const expiry_date = document.getElementById(`exp-${batchId}`).value || null;
+    const selling_price = document.getElementById(`sp-${batchId}`).value;
+    try {
+        await api(`/batches/${batchId}`, {
+            method: 'PUT',
+            body: JSON.stringify({ batch_ref_no, expiry_date, selling_price }),
+        });
+        toast('Batch updated');
+        loadBatches();
+    } catch (err) {
+        toast(err.message);
+    }
+}
+
+async function adjustStock(batchId, currentQty) {
+    const newQty = prompt('Set remaining quantity for this batch:', currentQty);
+    if (newQty === null) return;
+    try {
+        await api(`/batches/${batchId}/adjust`, {
+            method: 'PATCH',
+            body: JSON.stringify({ newQtyRemaining: Number(newQty) }),
+        });
+        toast('Stock adjusted');
+        loadBatches();
+    } catch (err) {
+        toast(err.message);
+    }
+}
+
+loadBatches();
+</script>
+</body>
+</html>

@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Sales - POS Batch System</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<nav>
+    <a href="items.html">Items</a>
+    <a href="purchase.html">Purchase</a>
+    <a href="pos.html">POS</a>
+    <a href="sales.html">Sales</a>
+</nav>
+<div class="container">
+    <h1>Sales</h1>
+    <table>
+        <thead>
+            <tr><th>Invoice No.</th><th>Date</th><th>Total</th><th>Amount Paid</th><th>Status</th><th></th></tr>
+        </thead>
+        <tbody id="salesBody"></tbody>
+    </table>
+
+    <div class="card" id="detailCard" style="display:none;">
+        <h2 style="font-size:15px;" id="detailTitle"></h2>
+        <table>
+            <thead><tr><th>Item</th><th>Batch</th><th>Qty</th><th>Unit Price</th><th>Line Total</th></tr></thead>
+            <tbody id="detailBody"></tbody>
+        </table>
+    </div>
+</div>
+<div id="toast"></div>
+<script src="js/common.js"></script>
+<script>
+async function loadSales() {
+    const sales = await api('/sales');
+    document.getElementById('salesBody').innerHTML = sales.map(s => `
+        <tr>
+            <td>${s.invoice_no}</td>
+            <td>${new Date(s.sale_date).toLocaleString()}</td>
+            <td>${s.total}</td>
+            <td>${s.amount_paid}</td>
+            <td>${s.status}</td>
+            <td><button class="secondary" onclick="viewSale(${s.sale_id})">View</button></td>
+        </tr>
+    `).join('') || '<tr><td colspan="6">No sales recorded yet.</td></tr>';
+}
+
+async function viewSale(saleId) {
+    const sale = await api(`/sales/${saleId}`);
+    document.getElementById('detailCard').style.display = 'block';
+    document.getElementById('detailTitle').textContent = `Invoice ${sale.invoice_no}`;
+    document.getElementById('detailBody').innerHTML = sale.lines.map(l => `
+        <tr>
+            <td>${l.item_name}</td>
+            <td>${l.batch_ref_no}</td>
+            <td>${l.qty}</td>
+            <td>${l.unit_price}</td>
+            <td>${l.line_total}</td>
+        </tr>
+    `).join('');
+}
+
+loadSales();
+</script>
+</body>
+</html>
