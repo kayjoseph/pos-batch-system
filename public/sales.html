@@ -6,44 +6,48 @@
 <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
-<nav>
-    <a href="items.html">Items</a>
-    <a href="purchase.html">Purchase</a>
-    <a href="pos.html">POS</a>
-    <a href="sales.html">Sales</a>
-</nav>
-<div class="container">
-    <h1>Sales</h1>
-    <table>
-        <thead>
-            <tr><th>Invoice No.</th><th>Date</th><th>Total</th><th>Amount Paid</th><th>Status</th><th></th></tr>
-        </thead>
-        <tbody id="salesBody"></tbody>
-    </table>
-
-    <div class="card" id="detailCard" style="display:none;">
-        <h2 style="font-size:15px;" id="detailTitle"></h2>
+<div class="app">
+    <div id="sidebarMount"></div>
+    <main class="content">
+        <h1>Sales</h1>
         <table>
-            <thead><tr><th>Item</th><th>Batch</th><th>Qty</th><th>Unit Price</th><th>Line Total</th></tr></thead>
-            <tbody id="detailBody"></tbody>
+            <thead>
+                <tr><th>Invoice No.</th><th>Date</th><th>Total</th><th>Amount Paid</th><th>Status</th><th></th></tr>
+            </thead>
+            <tbody id="salesBody"></tbody>
         </table>
-    </div>
+
+        <div class="card" id="detailCard" style="display:none; margin-top:18px;">
+            <h2 class="section-title" id="detailTitle"></h2>
+            <table>
+                <thead><tr><th>Item</th><th>Batch</th><th>Qty</th><th>Unit Price</th><th>Line Total</th></tr></thead>
+                <tbody id="detailBody"></tbody>
+            </table>
+        </div>
+    </main>
 </div>
 <div id="toast"></div>
 <script src="js/common.js"></script>
 <script>
+renderSidebar('sales');
+
 async function loadSales() {
     const sales = await api('/sales');
-    document.getElementById('salesBody').innerHTML = sales.map(s => `
+    const body = document.getElementById('salesBody');
+    if (sales.length === 0) {
+        body.innerHTML = `<tr><td colspan="6"><div class="empty-state">No sales recorded yet.</div></td></tr>`;
+        return;
+    }
+    body.innerHTML = sales.map(s => `
         <tr>
-            <td>${s.invoice_no}</td>
-            <td>${new Date(s.sale_date).toLocaleString()}</td>
-            <td>${s.total}</td>
-            <td>${s.amount_paid}</td>
-            <td>${s.status}</td>
+            <td class="mono">${s.invoice_no}</td>
+            <td class="mono">${new Date(s.sale_date).toLocaleString()}</td>
+            <td class="mono">${s.total}</td>
+            <td class="mono">${s.amount_paid}</td>
+            <td><span class="badge ${s.status}">${s.status}</span></td>
             <td><button class="secondary" onclick="viewSale(${s.sale_id})">View</button></td>
         </tr>
-    `).join('') || '<tr><td colspan="6">No sales recorded yet.</td></tr>';
+    `).join('');
 }
 
 async function viewSale(saleId) {
@@ -53,10 +57,10 @@ async function viewSale(saleId) {
     document.getElementById('detailBody').innerHTML = sale.lines.map(l => `
         <tr>
             <td>${l.item_name}</td>
-            <td>${l.batch_ref_no}</td>
-            <td>${l.qty}</td>
-            <td>${l.unit_price}</td>
-            <td>${l.line_total}</td>
+            <td class="mono">${l.batch_ref_no}</td>
+            <td class="mono">${l.qty}</td>
+            <td class="mono">${l.unit_price}</td>
+            <td class="mono">${l.line_total}</td>
         </tr>
     `).join('');
 }
