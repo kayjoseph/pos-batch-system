@@ -31,7 +31,9 @@ function expiryClass(dateStr) {
 }
 
 /* ============ Sidebar ============ */
-// activePage one of: 'items-register', 'items-list', 'purchase', 'pos', 'sales'
+// activePage one of:
+// 'items-register', 'items-list', 'purchase-add', 'purchase-list',
+// 'pos-terminal', 'invoice', 'sales'
 function renderSidebar(activePage) {
     const icons = {
         items: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8L12 3 3 8l9 5 9-5z"/><path d="M3 8v8l9 5 9-5V8"/><path d="M12 13v8"/></svg>',
@@ -42,6 +44,8 @@ function renderSidebar(activePage) {
     };
 
     const itemsOpen = activePage === 'items-register' || activePage === 'items-list';
+    const purchaseOpen = activePage === 'purchase-add' || activePage === 'purchase-list';
+    const posOpen = activePage === 'pos-terminal' || activePage === 'invoice';
 
     const html = `
     <nav class="sidebar">
@@ -58,15 +62,23 @@ function renderSidebar(activePage) {
         </div>
 
         <div class="nav-item">
-            <a class="nav-link ${activePage === 'purchase' ? 'active' : ''}" href="purchase.html">
-                ${icons.purchase}<span>Purchase</span>
-            </a>
+            <div class="nav-link" id="purchaseToggle">
+                ${icons.purchase}<span>Purchase</span>${icons.chevron}
+            </div>
+            <div class="nav-sublist ${purchaseOpen ? 'open' : ''}" id="purchaseSublist">
+                <a class="nav-sublink ${activePage === 'purchase-add' ? 'active' : ''}" href="purchase-add.html">Add Purchase</a>
+                <a class="nav-sublink ${activePage === 'purchase-list' ? 'active' : ''}" href="purchase.html">Purchase List</a>
+            </div>
         </div>
 
         <div class="nav-item">
-            <a class="nav-link ${activePage === 'pos' ? 'active' : ''}" href="pos.html">
-                ${icons.pos}<span>POS</span>
-            </a>
+            <div class="nav-link" id="posToggle">
+                ${icons.pos}<span>POS</span>${icons.chevron}
+            </div>
+            <div class="nav-sublist ${posOpen ? 'open' : ''}" id="posSublist">
+                <a class="nav-sublink ${activePage === 'pos-terminal' ? 'active' : ''}" href="pos-terminal.html">POS Terminal</a>
+                <a class="nav-sublink ${activePage === 'invoice' ? 'active' : ''}" href="invoice.html">Invoice Entry</a>
+            </div>
         </div>
 
         <div class="nav-item">
@@ -78,12 +90,19 @@ function renderSidebar(activePage) {
 
     document.getElementById('sidebarMount').outerHTML = html;
 
-    const toggle = document.getElementById('itemsToggle');
-    const sublist = document.getElementById('itemsSublist');
-    const chevron = toggle.querySelector('.chevron');
-    if (itemsOpen) chevron.classList.add('open');
-    toggle.addEventListener('click', () => {
-        sublist.classList.toggle('open');
-        chevron.classList.toggle('open');
+    // Wire up all dropdowns the same way
+    [
+        { toggleId: 'itemsToggle', sublistId: 'itemsSublist', open: itemsOpen },
+        { toggleId: 'purchaseToggle', sublistId: 'purchaseSublist', open: purchaseOpen },
+        { toggleId: 'posToggle', sublistId: 'posSublist', open: posOpen },
+    ].forEach(({ toggleId, sublistId, open }) => {
+        const toggle = document.getElementById(toggleId);
+        const sublist = document.getElementById(sublistId);
+        const chevron = toggle.querySelector('.chevron');
+        if (open) chevron.classList.add('open');
+        toggle.addEventListener('click', () => {
+            sublist.classList.toggle('open');
+            chevron.classList.toggle('open');
+        });
     });
 }
