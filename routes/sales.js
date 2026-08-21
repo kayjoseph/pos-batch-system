@@ -3,6 +3,24 @@ const router = express.Router();
 const pool = require('../db/pool');
 const { allocateStock, commitAllocation, getAvailableBatches } = require('../db/batchAllocator');
 
+const VALID_METHODS = ['cash', 'mpesa', 'bank'];
+
+/**
+ * Generates the next invoice number, e.g. INV-0001, INV-0002...
+ * Used by the POS Terminal, which doesn't ask the cashier to type one.
+ * The Invoice Entry screen can still supply its own invoice_no manually.
+ */
+async function generateNextInvoiceNo(client) {
+    const result = await client.query(
+        `SELECT invoice_no FROM sales
+         WHERE invoice_no ~ '^INV-[0-9]+$'
+         ORDER BY sale_id DESC LIMIT 1`
+    );
+    if (result.rows.length === 0) return 'INV-0001';
+    const lastNumber = parseInt(result.rows[0].invoice_no.split('-')[1], 10);
+    return `INV-${String(lastNumber + 1).padStart(4, '0')}`;
+}
+
 // GET batches available for an item, for the "change batch" picker in the cart
 router.get('/available-batches/:itemId', async (req, res) => {
     try {
@@ -25,7 +43,7 @@ router.get('/', async (req, res) => {
     }
 });
 
-// GET one sale with its line items (including which batch each line drew from)
+// GET one sale with its line items and payment breakdown
 router.get('/:id', async (req, res) => {
     try {
         const sale = await pool.query('SELECT * FROM sales WHERE sale_id = $1', [req.params.id]);
@@ -39,7 +57,13 @@ router.get('/:id', async (req, res) => {
              WHERE si.sale_id = $1`,
             [req.params.id]
         );
-        res.json({ ...sale.rows[0], lines: lines.rows });
+
+        const payments = await pool.query(
+            `SELECT method, amount FROM sale_payments WHERE sale_id = $1`,
+            [req.params.id]
+        );
+
+        res.json({ ...sale.rows[0], lines: lines.rows, payments: payments.rows });
     } catch (err) {
         console.error(err);
         res.status(500).json({ error: 'Failed to fetch sale' });
@@ -48,26 +72,51 @@ router.get('/:id', async (req, res) => {
 
 // CREATE a sale (checkout). Body shape:
 // {
-//   invoice_no: "INV-1001",
-//   amount_paid: 500,
+//   invoice_no: "INV-1001",     // optional - auto-generated if blank (POS Terminal does this)
+//   customer_name: "Jane Doe",  // optional - defaults to "Walk-in Customer"
+//   payments: [                 // preferred - supports split payment across methods
+//     { method: "cash", amount: 200 },
+//     { method: "mpesa", amount: 300 }
+//   ],
+//   amount_paid: 500,           // legacy fallback if "payments" isn't sent (single amount, no method)
 //   cart: [
-//     { item_id, qty, mode: "fifo" },                     // default: auto FIFO, auto-splits across batches
-//     { item_id, qty, mode: "manual", batch_id: 7 }        // customer asked for a specific batch
+//     { item_id, qty, mode: "fifo" },
+//     { item_id, qty, mode: "manual", batch_id: 7 }
 //   ]
 // }
 router.post('/', async (req, res) => {
-    const { invoice_no, amount_paid = 0, cart } = req.body;
-    if (!invoice_no) return res.status(400).json({ error: 'invoice_no is required' });
+    const { customer_name, payments, amount_paid: legacyAmountPaid = 0, cart } = req.body;
+    let { invoice_no } = req.body;
+
     if (!Array.isArray(cart) || cart.length === 0) {
         return res.status(400).json({ error: 'Cart cannot be empty' });
+    }
+
+    let amountPaid = 0;
+    let paymentRows = [];
+    if (Array.isArray(payments) && payments.length > 0) {
+        for (const p of payments) {
+            if (!VALID_METHODS.includes(p.method)) {
+                return res.status(400).json({ error: `Invalid payment method: ${p.method}` });
+            }
+            if (!p.amount || p.amount <= 0) continue; // skip empty split fields
+            amountPaid += Number(p.amount);
+            paymentRows.push({ method: p.method, amount: Number(p.amount) });
+        }
+    } else {
+        amountPaid = Number(legacyAmountPaid) || 0;
     }
 
     const client = await pool.connect();
     try {
         await client.query('BEGIN');
 
+        if (!invoice_no || !invoice_no.trim()) {
+            invoice_no = await generateNextInvoiceNo(client);
+        }
+
         let total = 0;
-        const allLines = []; // { item_id, batch_id, qty, unit_price, line_total }
+        const allLines = [];
 
         for (const cartLine of cart) {
             const { item_id, qty, mode = 'fifo', batch_id = null } = cartLine;
@@ -75,8 +124,6 @@ router.post('/', async (req, res) => {
                 throw new Error('Each cart line needs a valid item_id and qty');
             }
 
-            // allocateStock() decides which batch(es) this line pulls from -
-            // FIFO with auto-split, or the single batch the customer picked.
             const allocations = await allocateStock(item_id, qty, mode, batch_id);
 
             for (const alloc of allocations) {
@@ -91,16 +138,15 @@ router.post('/', async (req, res) => {
                 });
             }
 
-            // Deduct stock now, inside the same transaction, so a failure later rolls this back too
             await commitAllocation(client, allocations);
         }
 
-        const status = amount_paid >= total ? 'paid' : (amount_paid > 0 ? 'partial' : 'unpaid');
+        const status = amountPaid >= total && total > 0 ? 'paid' : (amountPaid > 0 ? 'partial' : 'unpaid');
 
         const saleResult = await client.query(
-            `INSERT INTO sales (invoice_no, amount_paid, total, status)
-             VALUES ($1, $2, $3, $4) RETURNING *`,
-            [invoice_no, amount_paid, total, status]
+            `INSERT INTO sales (invoice_no, customer_name, amount_paid, total, status)
+             VALUES ($1, $2, $3, $4, $5) RETURNING *`,
+            [invoice_no, (customer_name && customer_name.trim()) || 'Walk-in Customer', amountPaid, total, status]
         );
         const sale = saleResult.rows[0];
 
@@ -109,6 +155,13 @@ router.post('/', async (req, res) => {
                 `INSERT INTO sale_items (sale_id, item_id, batch_id, qty, unit_price, line_total)
                  VALUES ($1, $2, $3, $4, $5, $6)`,
                 [sale.sale_id, line.item_id, line.batch_id, line.qty, line.unit_price, line.line_total]
+            );
+        }
+
+        for (const p of paymentRows) {
+            await client.query(
+                `INSERT INTO sale_payments (sale_id, method, amount) VALUES ($1, $2, $3)`,
+                [sale.sale_id, p.method, p.amount]
             );
         }
 
