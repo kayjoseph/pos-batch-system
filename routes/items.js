@@ -7,7 +7,10 @@ router.get('/', async (req, res) => {
     try {
         const result = await pool.query(`
             SELECT i.item_id, i.name, i.sku, i.category,
-                   COALESCE(SUM(b.qty_remaining), 0) AS total_stock
+                   COALESCE(SUM(b.qty_remaining), 0) AS total_stock,
+                   (SELECT b2.selling_price FROM batches b2
+                    WHERE b2.item_id = i.item_id AND b2.qty_remaining > 0
+                    ORDER BY b2.date_received ASC, b2.batch_id ASC LIMIT 1) AS next_price
             FROM items i
             LEFT JOIN batches b ON b.item_id = i.item_id
             GROUP BY i.item_id
