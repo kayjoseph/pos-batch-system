@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Register Item - POS Batch System</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="app">
+    <div id="sidebarMount"></div>
+    <main class="content">
+        <h1>Register Item</h1>
+
+        <div class="card" style="max-width:480px;">
+            <div class="form-row">
+                <label>Name</label><input id="name" placeholder="e.g. Paracetamol 500mg" style="flex:1;">
+            </div>
+            <div class="form-row">
+                <label>SKU</label><input id="sku" placeholder="optional" style="flex:1;">
+            </div>
+            <div class="form-row">
+                <label>Category</label><input id="category" placeholder="optional" style="flex:1;">
+            </div>
+            <button onclick="createItem()">Save Item</button>
+        </div>
+    </main>
+</div>
+<div id="toast"></div>
+<script src="js/common.js"></script>
+<script>
+renderSidebar('items-register');
+
+async function createItem() {
+    const name = document.getElementById('name').value.trim();
+    const sku = document.getElementById('sku').value.trim();
+    const category = document.getElementById('category').value.trim();
+    if (!name) return toast('Item name is required');
+    try {
+        await api('/items', { method: 'POST', body: JSON.stringify({ name, sku, category }) });
+        // Same pattern as the batch view redirect - land on the list right after saving
+        window.location.href = 'items.html';
+    } catch (err) {
+        toast(err.message);
+    }
+}
+</script>
+</body>
+</html>
