@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Add Purchase - POS Batch System</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="app">
+    <div id="sidebarMount"></div>
+    <main class="content">
+        <h1>Add Purchase</h1>
+
+        <div class="card">
+            <div class="form-row">
+                <label>Supplier</label><input id="supplier" placeholder="optional" style="flex:1;">
+            </div>
+            <div class="form-row">
+                <label>Status</label>
+                <select id="status">
+                    <option value="received">Received - stock updates now</option>
+                    <option value="lpo">LPO (Order) - stock updates once received</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2 class="section-title">Purchase Lines</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Item</th><th>Qty</th><th>Cost Price</th><th>Selling Price</th>
+                        <th>Batch Ref No.</th><th>Expiry Date</th><th></th>
+                    </tr>
+                </thead>
+                <tbody id="linesBody">
+                    <tr id="emptyLinesRow"><td colspan="7"><div class="empty-state">No lines yet - click "+ Add Line" to start.</div></td></tr>
+                </tbody>
+            </table>
+            <button class="secondary" onclick="addLine()" style="margin-top:12px;">+ Add Line</button>
+        </div>
+
+        <div class="card">
+            <strong>Subtotal: <span class="mono" id="subtotal">0.00</span></strong>
+            <div class="form-row" style="margin-top:14px;">
+                <label>Amount Paid</label><input id="amountPaid" type="number" step="0.01" value="0" style="width:120px;">
+            </div>
+            <div class="form-row">
+                <label>Payment Method</label>
+                <select id="paymentMethod">
+                    <option value="">-- none yet --</option>
+                    <option value="cash">Cash</option>
+                    <option value="mpesa">M-Pesa</option>
+                    <option value="bank">Bank</option>
+                </select>
+            </div>
+            <button onclick="savePurchase()" style="margin-top:6px;">Save Purchase</button>
+        </div>
+    </main>
+</div>
+<div id="toast"></div>
+<script src="js/common.js"></script>
+<script>
+renderSidebar('purchase-add');
+
+let items = [];
+let lineCount = 0;
+
+async function init() {
+    items = await api('/items');
+    // No default line - purely opt-in via "+ Add Line", per the requested change.
+}
+
+function itemOptions(selectedId) {
+    return items.map(i => `<option value="${i.item_id}" ${i.item_id == selectedId ? 'selected' : ''}>${i.name}</option>`).join('');
+}
+
+function addLine() {
+    const emptyRow = document.getElementById('emptyLinesRow');
+    if (emptyRow) emptyRow.remove();
+
+    const id = lineCount++;
+    const row = document.createElement('tr');
+    row.id = `line-${id}`;
+    row.innerHTML = `
+        <td><select id="item-${id}">${itemOptions()}</select></td>
+        <td><input type="number" id="qty-${id}" style="width:70px" value="1" oninput="recalc()"></td>
+        <td><input type="number" step="0.01" id="cost-${id}" style="width:90px" value="0" oninput="recalc()"></td>
+        <td><input type="number" step="0.01" id="sp-${id}" style="width:90px" value="0"></td>
+        <td><input id="ref-${id}" placeholder="auto if blank" style="width:110px"></td>
+        <td><input type="date" id="exp-${id}"></td>
+        <td><button class="danger" onclick="removeLine(${id})">X</button></td>
+    `;
+    document.getElementById('linesBody').appendChild(row);
+    recalc();
+}
+
+function removeLine(id) {
+    const row = document.getElementById(`line-${id}`);
+    if (row) row.remove();
+    if (document.querySelectorAll('[id^="line-"]').length === 0) {
+        document.getElementById('linesBody').innerHTML =
+            '<tr id="emptyLinesRow"><td colspan="7"><div class="empty-state">No lines yet - click "+ Add Line" to start.</div></td></tr>';
+    }
+    recalc();
+}
+
+function recalc() {
+    let subtotal = 0;
+    document.querySelectorAll('[id^="line-"]').forEach(row => {
+        const id = row.id.split('-')[1];
+        const qty = Number(document.getElementById(`qty-${id}`).value) || 0;
+        const cost = Number(document.getElementById(`cost-${id}`).value) || 0;
+        subtotal += qty * cost;
+    });
+    document.getElementById('subtotal').textContent = subtotal.toFixed(2);
+}
+
+async function savePurchase() {
+    const supplier = document.getElementById('supplier').value.trim();
+    const status = document.getElementById('status').value;
+    const amount_paid = Number(document.getElementById('amountPaid').value) || 0;
+    const paymentMethodValue = document.getElementById('paymentMethod').value;
+    const payment_method = paymentMethodValue || null;
+
+    const lines = [];
+    document.querySelectorAll('[id^="line-"]').forEach(row => {
+        const id = row.id.split('-')[1];
+        lines.push({
+            item_id: Number(document.getElementById(`item-${id}`).value),
+            qty: Number(document.getElementById(`qty-${id}`).value),
+            cost_price: Number(document.getElementById(`cost-${id}`).value),
+            selling_price: Number(document.getElementById(`sp-${id}`).value),
+            batch_ref_no: document.getElementById(`ref-${id}`).value.trim(),
+            expiry_date: document.getElementById(`exp-${id}`).value || null,
+        });
+    });
+
+    if (lines.length === 0) return toast('Add at least one line');
+    if (amount_paid > 0 && !payment_method) return toast('Select a payment method for the amount paid');
+
+    try {
+        await api('/purchases', {
+            method: 'POST',
+            body: JSON.stringify({ supplier, status, amount_paid, payment_method, lines }),
+        });
+        toast(status === 'received' ? 'Purchase saved - stock updated' : 'Purchase order recorded (LPO)');
+        window.location.href = 'purchase.html';
+    } catch (err) {
+        toast(err.message);
+    }
+}
+
+init();
+</script>
+</body>
+</html>
