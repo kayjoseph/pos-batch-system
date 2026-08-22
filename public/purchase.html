@@ -2,127 +2,169 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Purchase - POS Batch System</title>
+<title>Purchase List - POS Batch System</title>
 <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
 <div class="app">
     <div id="sidebarMount"></div>
     <main class="content">
-        <h1>Record Purchase</h1>
+        <h1>Purchase List</h1>
 
-        <div class="card">
-            <div class="form-row">
-                <label>Supplier</label><input id="supplier" placeholder="optional">
+        <div class="list-filter-bar">
+            <div class="field">
+                <label>Search</label>
+                <input id="filterSupplier" placeholder="Search supplier name or invoice no..." oninput="applyFilters()">
             </div>
-            <div class="form-row">
-                <label>Discount</label><input id="discount" type="number" step="0.01" value="0" style="width:100px">
+            <div class="field">
+                <label>From</label>
+                <input type="date" id="filterFrom" oninput="applyFilters()">
             </div>
+            <div class="field">
+                <label>To</label>
+                <input type="date" id="filterTo" oninput="applyFilters()">
+            </div>
+            <button class="secondary" onclick="clearFilters()">Clear</button>
         </div>
 
-        <div class="card">
-            <h2 class="section-title">Purchase Lines</h2>
-            <table>
-                <thead>
-                    <tr>
-                        <th>Item</th><th>Qty</th><th>Cost Price</th><th>Selling Price</th>
-                        <th>Batch Ref No.</th><th>Expiry Date</th><th></th>
-                    </tr>
-                </thead>
-                <tbody id="linesBody"></tbody>
-            </table>
-            <button class="secondary" onclick="addLine()" style="margin-top:12px;">+ Add Line</button>
-        </div>
-
-        <div class="card">
-            <strong>Subtotal: <span class="mono" id="subtotal">0.00</span></strong>
-            <br><br>
-            <button onclick="savePurchase()">Save Purchase</button>
-        </div>
+        <table>
+            <thead>
+                <tr>
+                    <th>Invoice No.</th><th>Date</th><th>Supplier</th><th>Status</th><th>Total</th>
+                    <th>Paid</th><th>Balance</th><th>Payment</th><th></th>
+                </tr>
+            </thead>
+            <tbody id="purchasesBody"></tbody>
+        </table>
     </main>
 </div>
+
+<div id="payModal" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(15,20,28,0.5);">
+    <div class="card" style="max-width:400px; margin:100px auto;">
+        <h2 class="section-title">Record Payment</h2>
+        <p style="font-size:13px; color:var(--text-muted); margin-top:-6px;">Balance due: <span class="mono" id="payBalance"></span></p>
+        <div class="form-row">
+            <label>Amount</label><input id="payAmount" type="number" step="0.01" style="width:140px;">
+        </div>
+        <div class="form-row">
+            <label>Method</label>
+            <select id="payMethod">
+                <option value="cash">Cash</option>
+                <option value="mpesa">M-Pesa</option>
+                <option value="bank">Bank</option>
+            </select>
+        </div>
+        <button onclick="submitPayment()">Save Payment</button>
+        <button class="secondary" onclick="closePayModal()">Cancel</button>
+    </div>
+</div>
+
 <div id="toast"></div>
 <script src="js/common.js"></script>
 <script>
-renderSidebar('purchase');
+renderSidebar('purchase-list');
 
-let items = [];
-let lineCount = 0;
+let purchases = [];
+let payTargetId = null;
 
-async function init() {
-    items = await api('/items');
-    addLine();
+async function loadPurchases() {
+    purchases = await api('/purchases');
+    applyFilters();
 }
 
-function itemOptions(selectedId) {
-    return items.map(i => `<option value="${i.item_id}" ${i.item_id == selectedId ? 'selected' : ''}>${i.name}</option>`).join('');
-}
+function applyFilters() {
+    const query = document.getElementById('filterSupplier').value.trim().toLowerCase();
+    const from = document.getElementById('filterFrom').value;
+    const to = document.getElementById('filterTo').value;
 
-function addLine() {
-    const id = lineCount++;
-    const row = document.createElement('tr');
-    row.id = `line-${id}`;
-    row.innerHTML = `
-        <td><select id="item-${id}">${itemOptions()}</select></td>
-        <td><input type="number" id="qty-${id}" style="width:70px" value="1" oninput="recalc()"></td>
-        <td><input type="number" step="0.01" id="cost-${id}" style="width:90px" value="0" oninput="recalc()"></td>
-        <td><input type="number" step="0.01" id="sp-${id}" style="width:90px" value="0"></td>
-        <td><input id="ref-${id}" placeholder="auto if blank" style="width:110px"></td>
-        <td><input type="date" id="exp-${id}"></td>
-        <td><button class="danger" onclick="removeLine(${id})">X</button></td>
-    `;
-    document.getElementById('linesBody').appendChild(row);
-    recalc();
-}
-
-function removeLine(id) {
-    const row = document.getElementById(`line-${id}`);
-    if (row) row.remove();
-    recalc();
-}
-
-function recalc() {
-    let subtotal = 0;
-    document.querySelectorAll('[id^="line-"]').forEach(row => {
-        const id = row.id.split('-')[1];
-        const qty = Number(document.getElementById(`qty-${id}`).value) || 0;
-        const cost = Number(document.getElementById(`cost-${id}`).value) || 0;
-        subtotal += qty * cost;
-    });
-    document.getElementById('subtotal').textContent = subtotal.toFixed(2);
-}
-
-async function savePurchase() {
-    const supplier = document.getElementById('supplier').value.trim();
-    const discount = Number(document.getElementById('discount').value) || 0;
-
-    const lines = [];
-    document.querySelectorAll('[id^="line-"]').forEach(row => {
-        const id = row.id.split('-')[1];
-        lines.push({
-            item_id: Number(document.getElementById(`item-${id}`).value),
-            qty: Number(document.getElementById(`qty-${id}`).value),
-            cost_price: Number(document.getElementById(`cost-${id}`).value),
-            selling_price: Number(document.getElementById(`sp-${id}`).value),
-            batch_ref_no: document.getElementById(`ref-${id}`).value.trim(),
-            expiry_date: document.getElementById(`exp-${id}`).value || null,
-        });
+    const filtered = purchases.filter(p => {
+        if (query) {
+            const matchesSupplier = (p.supplier || '').toLowerCase().includes(query);
+            const matchesInvoice = (p.purchase_invoice_no || '').toLowerCase().includes(query);
+            if (!matchesSupplier && !matchesInvoice) return false;
+        }
+        const purchaseDate = p.purchase_date.substring(0, 10);
+        if (from && purchaseDate < from) return false;
+        if (to && purchaseDate > to) return false;
+        return true;
     });
 
-    if (lines.length === 0) return toast('Add at least one line');
+    renderPurchases(filtered);
+}
 
+function clearFilters() {
+    document.getElementById('filterSupplier').value = '';
+    document.getElementById('filterFrom').value = '';
+    document.getElementById('filterTo').value = '';
+    applyFilters();
+}
+
+function renderPurchases(list) {
+    const body = document.getElementById('purchasesBody');
+    if (list.length === 0) {
+        body.innerHTML = `<tr><td colspan="9"><div class="empty-state">No purchases match these filters.</div></td></tr>`;
+        return;
+    }
+    body.innerHTML = list.map(p => `
+        <tr>
+            <td class="mono">${p.purchase_invoice_no || '-'}</td>
+            <td class="mono">${new Date(p.purchase_date).toLocaleDateString()}</td>
+            <td>${p.supplier || '-'}</td>
+            <td><span class="badge ${p.status}">${p.status === 'lpo' ? 'LPO' : 'Received'}</span></td>
+            <td class="mono">${p.total}</td>
+            <td class="mono">${p.amount_paid}</td>
+            <td class="mono">${p.balance}</td>
+            <td><span class="badge ${p.payment_status}">${p.payment_status}</span></td>
+            <td>
+                <button class="secondary" onclick="location.href='purchase-view.html?id=${p.purchase_id}'">View</button>
+                ${p.status === 'lpo' ? `<button onclick="receiveStock(${p.purchase_id})">Receive Stock</button>` : ''}
+                ${p.payment_status !== 'paid' ? `<button onclick="openPayModal(${p.purchase_id}, ${p.balance})">Pay Now</button>` : ''}
+            </td>
+        </tr>
+    `).join('');
+}
+
+async function receiveStock(id) {
+    if (!confirm('Mark this purchase as received? This will create stock batches for every ordered line.')) return;
     try {
-        await api('/purchases', { method: 'POST', body: JSON.stringify({ supplier, discount, lines }) });
-        toast('Purchase saved - batches created');
-        document.getElementById('linesBody').innerHTML = '';
-        lineCount = 0;
-        addLine();
+        await api(`/purchases/${id}/receive`, { method: 'POST' });
+        toast('Stock received');
+        loadPurchases();
     } catch (err) {
         toast(err.message);
     }
 }
 
-init();
+function openPayModal(id, balance) {
+    payTargetId = id;
+    document.getElementById('payBalance').textContent = balance;
+    document.getElementById('payAmount').value = balance;
+    document.getElementById('payModal').style.display = 'block';
+}
+
+function closePayModal() {
+    document.getElementById('payModal').style.display = 'none';
+    payTargetId = null;
+}
+
+async function submitPayment() {
+    const amount = Number(document.getElementById('payAmount').value);
+    const payment_method = document.getElementById('payMethod').value;
+    if (!amount || amount <= 0) return toast('Enter a valid amount');
+    try {
+        await api(`/purchases/${payTargetId}/pay`, {
+            method: 'POST',
+            body: JSON.stringify({ amount, payment_method }),
+        });
+        toast('Payment recorded');
+        closePayModal();
+        loadPurchases();
+    } catch (err) {
+        toast(err.message);
+    }
+}
+
+loadPurchases();
 </script>
 </body>
 </html>
