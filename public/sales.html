@@ -10,20 +10,29 @@
     <div id="sidebarMount"></div>
     <main class="content">
         <h1>Sales</h1>
+
+        <div class="list-filter-bar">
+            <div class="field">
+                <label>Search</label>
+                <input id="filterCustomer" placeholder="Search customer name or invoice no..." oninput="applyFilters()">
+            </div>
+            <div class="field">
+                <label>From</label>
+                <input type="date" id="filterFrom" oninput="applyFilters()">
+            </div>
+            <div class="field">
+                <label>To</label>
+                <input type="date" id="filterTo" oninput="applyFilters()">
+            </div>
+            <button class="secondary" onclick="clearFilters()">Clear</button>
+        </div>
+
         <table>
             <thead>
-                <tr><th>Invoice No.</th><th>Date</th><th>Total</th><th>Amount Paid</th><th>Status</th><th></th></tr>
+                <tr><th>Invoice No.</th><th>Date</th><th>Customer</th><th>Total</th><th>Amount Paid</th><th>Status</th><th></th></tr>
             </thead>
             <tbody id="salesBody"></tbody>
         </table>
-
-        <div class="card" id="detailCard" style="display:none; margin-top:18px;">
-            <h2 class="section-title" id="detailTitle"></h2>
-            <table>
-                <thead><tr><th>Item</th><th>Batch</th><th>Qty</th><th>Unit Price</th><th>Line Total</th></tr></thead>
-                <tbody id="detailBody"></tbody>
-            </table>
-        </div>
     </main>
 </div>
 <div id="toast"></div>
@@ -31,36 +40,55 @@
 <script>
 renderSidebar('sales');
 
+let sales = [];
+
 async function loadSales() {
-    const sales = await api('/sales');
+    sales = await api('/sales');
+    applyFilters();
+}
+
+function applyFilters() {
+    const query = document.getElementById('filterCustomer').value.trim().toLowerCase();
+    const from = document.getElementById('filterFrom').value;
+    const to = document.getElementById('filterTo').value;
+
+    const filtered = sales.filter(s => {
+        if (query) {
+            const matchesCustomer = (s.customer_name || 'walk-in customer').toLowerCase().includes(query);
+            const matchesInvoice = (s.invoice_no || '').toLowerCase().includes(query);
+            if (!matchesCustomer && !matchesInvoice) return false;
+        }
+        const saleDate = s.sale_date.substring(0, 10);
+        if (from && saleDate < from) return false;
+        if (to && saleDate > to) return false;
+        return true;
+    });
+
+    renderSales(filtered);
+}
+
+function clearFilters() {
+    document.getElementById('filterCustomer').value = '';
+    document.getElementById('filterFrom').value = '';
+    document.getElementById('filterTo').value = '';
+    applyFilters();
+}
+
+function renderSales(list) {
     const body = document.getElementById('salesBody');
-    if (sales.length === 0) {
-        body.innerHTML = `<tr><td colspan="6"><div class="empty-state">No sales recorded yet.</div></td></tr>`;
+    if (list.length === 0) {
+        body.innerHTML = `<tr><td colspan="7"><div class="empty-state">No sales match these filters.</div></td></tr>`;
         return;
     }
-    body.innerHTML = sales.map(s => `
+    body.innerHTML = list.map(s => `
         <tr>
             <td class="mono">${s.invoice_no}</td>
             <td class="mono">${new Date(s.sale_date).toLocaleString()}</td>
+            <td>${s.customer_name || 'Walk-in Customer'}</td>
             <td class="mono">${s.total}</td>
             <td class="mono">${s.amount_paid}</td>
             <td><span class="badge ${s.status}">${s.status}</span></td>
-            <td><button class="secondary" onclick="viewSale(${s.sale_id})">View</button></td>
-        </tr>
-    `).join('');
-}
-
-async function viewSale(saleId) {
-    const sale = await api(`/sales/${saleId}`);
-    document.getElementById('detailCard').style.display = 'block';
-    document.getElementById('detailTitle').textContent = `Invoice ${sale.invoice_no}`;
-    document.getElementById('detailBody').innerHTML = sale.lines.map(l => `
-        <tr>
-            <td>${l.item_name}</td>
-            <td class="mono">${l.batch_ref_no}</td>
-            <td class="mono">${l.qty}</td>
-            <td class="mono">${l.unit_price}</td>
-            <td class="mono">${l.line_total}</td>
+            <td><button class="secondary" onclick="location.href='sale-view.html?id=${s.sale_id}'">View</button></td>
         </tr>
     `).join('');
 }
