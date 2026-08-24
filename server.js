@@ -7,6 +7,7 @@ const itemsRouter = require('./routes/items');
 const purchasesRouter = require('./routes/purchases');
 const salesRouter = require('./routes/sales');
 const batchesRouter = require('./routes/batches');
+const categoriesRouter = require('./routes/categories');
 
 const app = express();
 
@@ -18,6 +19,7 @@ app.use('/api/items', itemsRouter);
 app.use('/api/purchases', purchasesRouter);
 app.use('/api/sales', salesRouter);
 app.use('/api/batches', batchesRouter);
+app.use('/api/categories', categoriesRouter);
 
 app.get('/health', (req, res) => res.json({ status: 'ok' }));
 
