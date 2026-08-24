@@ -25,7 +25,10 @@
         </div>
 
         <div class="card">
-            <h2 class="section-title">Purchase Lines</h2>
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                <h2 class="section-title" style="margin:0;">Purchase Lines</h2>
+                <button class="secondary" onclick="addLine()">+ Add Line</button>
+            </div>
             <table>
                 <thead>
                     <tr>
@@ -37,7 +40,6 @@
                     <tr id="emptyLinesRow"><td colspan="7"><div class="empty-state">No lines yet - click "+ Add Line" to start.</div></td></tr>
                 </tbody>
             </table>
-            <button class="secondary" onclick="addLine()" style="margin-top:12px;">+ Add Line</button>
         </div>
 
         <div class="card">
@@ -71,10 +73,6 @@ async function init() {
     // No default line - purely opt-in via "+ Add Line", per the requested change.
 }
 
-function itemOptions(selectedId) {
-    return items.map(i => `<option value="${i.item_id}" ${i.item_id == selectedId ? 'selected' : ''}>${i.name}</option>`).join('');
-}
-
 function addLine() {
     const emptyRow = document.getElementById('emptyLinesRow');
     if (emptyRow) emptyRow.remove();
@@ -83,7 +81,13 @@ function addLine() {
     const row = document.createElement('tr');
     row.id = `line-${id}`;
     row.innerHTML = `
-        <td><select id="item-${id}">${itemOptions()}</select></td>
+        <td>
+            <div class="item-search-wrap" style="min-width:160px;">
+                <input id="item-search-${id}" placeholder="Search item..." autocomplete="off"
+                       oninput="renderLineSearchResults(${id})">
+                <div class="item-search-results" id="item-results-${id}" style="display:none;"></div>
+            </div>
+        </td>
         <td><input type="number" id="qty-${id}" style="width:70px" value="1" oninput="recalc()"></td>
         <td><input type="number" step="0.01" id="cost-${id}" style="width:90px" value="0" oninput="recalc()"></td>
         <td><input type="number" step="0.01" id="sp-${id}" style="width:90px" value="0"></td>
@@ -91,8 +95,40 @@ function addLine() {
         <td><input type="date" id="exp-${id}"></td>
         <td><button class="danger" onclick="removeLine(${id})">X</button></td>
     `;
-    document.getElementById('linesBody').appendChild(row);
+    document.getElementById('linesBody').prepend(row);
     recalc();
+}
+
+function renderLineSearchResults(id) {
+    const input = document.getElementById(`item-search-${id}`);
+    const query = input.value.trim().toLowerCase();
+    const box = document.getElementById(`item-results-${id}`);
+    input.dataset.itemId = ''; // typing invalidates any previously selected item
+
+    if (!query) { box.style.display = 'none'; return; }
+
+    const matches = items.filter(i =>
+        i.name.toLowerCase().includes(query) || (i.sku && i.sku.toLowerCase().includes(query))
+    );
+
+    if (matches.length === 0) {
+        box.innerHTML = `<div class="item-search-not-found">Item not found</div>`;
+    } else {
+        box.innerHTML = matches.map(i => `
+            <div class="item-search-row" onclick="selectLineItem(${id}, ${i.item_id})">
+                ${i.name} <span class="stock-hint">${i.sku ? '(' + i.sku + ')' : ''} - Qty: ${i.total_stock}</span>
+            </div>
+        `).join('');
+    }
+    box.style.display = 'block';
+}
+
+function selectLineItem(id, itemId) {
+    const item = items.find(i => i.item_id === itemId);
+    const input = document.getElementById(`item-search-${id}`);
+    input.value = item.name;
+    input.dataset.itemId = itemId;
+    document.getElementById(`item-results-${id}`).style.display = 'none';
 }
 
 function removeLine(id) {
@@ -124,10 +160,13 @@ async function savePurchase() {
     const payment_method = paymentMethodValue || null;
 
     const lines = [];
+    let hasUnselectedItem = false;
     document.querySelectorAll('[id^="line-"]').forEach(row => {
         const id = row.id.split('-')[1];
+        const itemIdRaw = document.getElementById(`item-search-${id}`).dataset.itemId;
+        if (!itemIdRaw) { hasUnselectedItem = true; return; }
         lines.push({
-            item_id: Number(document.getElementById(`item-${id}`).value),
+            item_id: Number(itemIdRaw),
             qty: Number(document.getElementById(`qty-${id}`).value),
             cost_price: Number(document.getElementById(`cost-${id}`).value),
             selling_price: Number(document.getElementById(`sp-${id}`).value),
@@ -136,6 +175,7 @@ async function savePurchase() {
         });
     });
 
+    if (hasUnselectedItem) return toast('Pick an item from the search results for every line');
     if (lines.length === 0) return toast('Add at least one line');
     if (amount_paid > 0 && !payment_method) return toast('Select a payment method for the amount paid');
 
@@ -152,6 +192,16 @@ async function savePurchase() {
 }
 
 init();
+
+// Hide a line's search results when clicking elsewhere on the page
+document.addEventListener('click', (e) => {
+    document.querySelectorAll('.item-search-wrap').forEach(wrap => {
+        if (!wrap.contains(e.target)) {
+            const results = wrap.querySelector('.item-search-results');
+            if (results) results.style.display = 'none';
+        }
+    });
+});
 </script>
 </body>
 </html>
