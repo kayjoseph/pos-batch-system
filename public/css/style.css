@@ -129,7 +129,7 @@ h2.section-title { font-size: 14px; margin: 0 0 12px 0; color: var(--text); }
     border-radius: 8px;
     margin-bottom: 18px;
 }
-table { width: 100%; border-collapse: collapse; background: var(--card); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+table { width: 100%; border-collapse: collapse; background: var(--card); border: 1px solid var(--border); border-radius: 8px; }
 th, td { padding: 10px 12px; border-bottom: 1px solid var(--border); text-align: left; font-size: 13.5px; }
 th { background: #fafbfc; font-weight: 600; color: var(--text-muted); font-size: 12px; text-transform: uppercase; letter-spacing: 0.03em; }
 tbody tr:last-child td { border-bottom: none; }
