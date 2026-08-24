@@ -6,20 +6,37 @@ const { allocateStock, commitAllocation, getAvailableBatches } = require('../db/
 const VALID_METHODS = ['cash', 'mpesa', 'bank'];
 
 /**
- * Generates the next invoice number, e.g. INV-0001, INV-0002...
- * Used by the POS Terminal, which doesn't ask the cashier to type one.
- * The Invoice Entry screen can still supply its own invoice_no manually.
+ * Generates the next invoice number, e.g. INV-0012, INV-0013...
+ * Looks at the trailing digits of every existing invoice_no, regardless of
+ * exact format (handles old manually-typed ones like "INV011" just as well
+ * as "INV-0011"), takes the highest, and continues from there. This is what
+ * keeps POS Terminal and Invoice Entry sharing one continuous sequence.
  */
 async function generateNextInvoiceNo(client) {
     const result = await client.query(
-        `SELECT invoice_no FROM sales
-         WHERE invoice_no ~ '^INV-[0-9]+$'
-         ORDER BY sale_id DESC LIMIT 1`
+        `SELECT MAX((regexp_match(invoice_no, '([0-9]+)$'))[1]::int) AS max_num
+         FROM sales
+         WHERE invoice_no ~ '[0-9]+$'`
     );
-    if (result.rows.length === 0) return 'INV-0001';
-    const lastNumber = parseInt(result.rows[0].invoice_no.split('-')[1], 10);
-    return `INV-${String(lastNumber + 1).padStart(4, '0')}`;
+    const maxNum = result.rows[0].max_num;
+    const nextNumber = maxNum ? maxNum + 1 : 1;
+    return `INV-${String(nextNumber).padStart(4, '0')}`;
 }
+
+// GET the next invoice number, read-only - used to prefill the Invoice Entry
+// field on page load. Does NOT reserve or write anything; if two people load
+// the page around the same time they'd see the same suggestion, but only the
+// sale that actually saves first gets that number (the real generation happens
+// again, safely inside the transaction, at POST time).
+router.get('/next-invoice-no', async (req, res) => {
+    try {
+        const next = await generateNextInvoiceNo(pool);
+        res.json({ next_invoice_no: next });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Failed to compute next invoice number' });
+    }
+});
 
 // GET batches available for an item, for the "change batch" picker in the cart
 router.get('/available-batches/:itemId', async (req, res) => {
