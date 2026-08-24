@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Sale Detail - POS Batch System</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="app">
+    <div id="sidebarMount"></div>
+    <main class="content">
+        <a class="back-link" href="sales.html">&larr; Back to Sales</a>
+
+        <div class="doc-card">
+            <div class="doc-header">
+                <div>
+                    <h1 id="docTitle">Sale</h1>
+                    <div class="doc-number" id="docDate"></div>
+                </div>
+                <span class="badge" id="statusBadge"></span>
+            </div>
+
+            <div class="doc-meta-grid">
+                <div class="doc-meta-block">
+                    <dt>Customer</dt><dd id="metaCustomer">-</dd>
+                    <dt>Invoice No.</dt><dd id="metaInvoice">-</dd>
+                </div>
+                <div class="doc-meta-block">
+                    <dt>Payment Methods</dt><dd id="metaPayments">-</dd>
+                    <dt>Amount Paid / Balance</dt><dd id="metaPaidBalance">-</dd>
+                </div>
+            </div>
+
+            <table>
+                <thead>
+                    <tr><th>Item</th><th>Batch</th><th>Qty</th><th>Unit Price</th><th>Line Total</th></tr>
+                </thead>
+                <tbody id="linesBody"></tbody>
+            </table>
+
+            <div class="doc-totals">
+                <div class="grand"><span>Total</span><span class="mono" id="totalAmount">0.00</span></div>
+            </div>
+
+            <div class="doc-actions">
+                <button class="secondary" disabled title="Coming soon">Download PDF</button>
+            </div>
+        </div>
+    </main>
+</div>
+<div id="toast"></div>
+<script src="js/common.js"></script>
+<script>
+renderSidebar('sales');
+
+const saleId = new URLSearchParams(location.search).get('id');
+
+async function load() {
+    if (!saleId) return toast('No sale specified');
+    try {
+        const sale = await api(`/sales/${saleId}`);
+        document.getElementById('docTitle').textContent = `Sale ${sale.invoice_no}`;
+        document.getElementById('docDate').textContent = new Date(sale.sale_date).toLocaleString();
+        document.getElementById('statusBadge').textContent = sale.status;
+        document.getElementById('statusBadge').className = `badge ${sale.status}`;
+        document.getElementById('metaCustomer').textContent = sale.customer_name || 'Walk-in Customer';
+        document.getElementById('metaInvoice').textContent = sale.invoice_no;
+        document.getElementById('metaPayments').textContent = sale.payments.length
+            ? sale.payments.map(p => `${p.method}: Ksh ${p.amount}`).join(', ')
+            : 'None recorded';
+        document.getElementById('metaPaidBalance').textContent =
+            `Ksh ${sale.amount_paid} / Ksh ${(Number(sale.total) - Number(sale.amount_paid)).toFixed(2)}`;
+
+        document.getElementById('linesBody').innerHTML = sale.lines.map(l => `
+            <tr>
+                <td>${l.item_name}</td>
+                <td class="mono">${l.batch_ref_no}</td>
+                <td class="mono">${l.qty}</td>
+                <td class="mono">${l.unit_price}</td>
+                <td class="mono">${l.line_total}</td>
+            </tr>
+        `).join('');
+
+        document.getElementById('totalAmount').textContent = sale.total;
+    } catch (err) {
+        toast(err.message);
+    }
+}
+
+load();
+</script>
+</body>
+</html>
