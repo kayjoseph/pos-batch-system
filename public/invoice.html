@@ -12,32 +12,41 @@
         <h1>Invoice Entry</h1>
 
         <div class="card">
-            <div class="form-row">
+            <div class="form-row" style="align-items:flex-start;">
                 <label>Item</label>
-                <select id="itemSelect"></select>
-                <label style="width:auto;">Qty</label>
-                <input type="number" id="qtyInput" value="1" style="width:70px">
-                <button onclick="addToCart()">Add to Cart</button>
+                <div class="item-search-wrap">
+                    <input id="itemSearch" placeholder="Search by name or barcode/SKU..." autocomplete="off"
+                           oninput="renderSearchResults()" onkeydown="if(event.key==='Enter'){event.preventDefault(); tryQuickAdd();}">
+                    <div class="item-search-results" id="searchResults" style="display:none;"></div>
+                </div>
             </div>
             <p style="font-size:12px; color:var(--text-muted); margin:6px 0 0 0;">
-                By default the oldest batch (FIFO) is used automatically. Use "Change Batch" on a cart line
-                if the customer wants a specific batch.
+                Type a name or barcode/SKU, pick it from the list (or press Enter to add the top match).
+                Qty and batch are adjusted directly in the cart below.
             </p>
         </div>
 
         <div class="card">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                <h2 class="section-title" style="margin:0;">Cart</h2>
+                <button class="cart-clear-btn" title="Cancel entire invoice" onclick="clearInvoice()">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/></svg>
+                </button>
+            </div>
             <table>
                 <thead>
-                    <tr><th>Item</th><th>Batch</th><th>Qty</th><th>Unit Price</th><th>Line Total</th><th></th></tr>
+                    <tr><th>Item</th><th>Qty</th><th>Unit Price</th><th>Batch</th><th>Line Total</th><th></th></tr>
                 </thead>
                 <tbody id="cartBody"></tbody>
             </table>
-            <h2 style="margin-top:16px;">Total: <span class="mono" id="cartTotal">0.00</span></h2>
+            <div style="text-align:right; margin-top:10px; font-size:15px; font-weight:700;">
+                Subtotal: <span class="mono" id="subtotal">0.00</span>
+            </div>
         </div>
 
         <div class="card">
             <div class="form-row">
-                <label>Invoice No.</label><input id="invoiceNo" placeholder="e.g. INV-1001">
+                <label>Invoice No.</label><input id="invoiceNo" placeholder="e.g. INV-0012">
             </div>
             <div class="form-row">
                 <label>Amount Paid</label><input id="amountPaid" type="number" step="0.01" value="0">
@@ -47,68 +56,202 @@
     </main>
 </div>
 
-<div id="batchModal" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(15,20,28,0.5);">
-    <div class="card" style="max-width:500px; margin:80px auto;">
-        <h2 class="section-title">Choose a Batch</h2>
-        <table>
-            <thead><tr><th>Ref No.</th><th>Expiry</th><th>Remaining</th><th>Price</th><th></th></tr></thead>
-            <tbody id="batchModalBody"></tbody>
-        </table>
-        <button class="secondary" onclick="closeBatchModal()" style="margin-top:12px;">Cancel</button>
-    </div>
-</div>
-
 <div id="toast"></div>
 <script src="js/common.js"></script>
 <script>
 renderSidebar('invoice');
 
 let items = [];
-let cart = [];
+let cart = []; // { cart_key, item_id, item_name, qty, mode, batch_id, unit_price, availableBatches, itemTotalStock }
 let cartKeyCounter = 0;
-let modalTargetKey = null;
+let currentMatches = [];
 
 async function init() {
     items = await api('/items');
-    document.getElementById('itemSelect').innerHTML = items.map(i => `<option value="${i.item_id}">${i.name}</option>`).join('');
+    try {
+        const { next_invoice_no } = await api('/sales/next-invoice-no');
+        document.getElementById('invoiceNo').value = next_invoice_no;
+    } catch (err) {
+        // Non-fatal - the field just stays blank and can still be typed manually.
+    }
 }
 
-function addToCart() {
-    const itemId = Number(document.getElementById('itemSelect').value);
-    const qty = Number(document.getElementById('qtyInput').value);
-    const item = items.find(i => i.item_id === itemId);
-    if (!qty || qty <= 0) return toast('Enter a valid quantity');
+function matchItems(query) {
+    const q = query.trim().toLowerCase();
+    if (!q) return [];
+    return items.filter(i => i.name.toLowerCase().includes(q) || (i.sku && i.sku.toLowerCase().includes(q)));
+}
 
-    cart.push({
+function renderSearchResults() {
+    const query = document.getElementById('itemSearch').value;
+    currentMatches = matchItems(query);
+    const box = document.getElementById('searchResults');
+
+    if (!query.trim()) { box.style.display = 'none'; return; }
+
+    if (currentMatches.length === 0) {
+        box.innerHTML = `<div class="item-search-not-found">Item not found</div>`;
+    } else {
+        box.innerHTML = currentMatches.map(i => `
+            <div class="item-search-row" onclick="selectItem(${i.item_id})">
+                ${i.name} <span class="stock-hint">${i.sku ? '(' + i.sku + ')' : ''} - Qty: ${i.total_stock}</span>
+            </div>
+        `).join('');
+    }
+    box.style.display = 'block';
+}
+
+function selectItem(itemId) {
+    document.getElementById('searchResults').style.display = 'none';
+    document.getElementById('itemSearch').value = '';
+    addItemToCart(itemId);
+}
+
+function tryQuickAdd() {
+    if (currentMatches.length === 0) return toast('Item not found');
+    document.getElementById('searchResults').style.display = 'none';
+    document.getElementById('itemSearch').value = '';
+    addItemToCart(currentMatches[0].item_id);
+}
+
+// Walks available batches oldest-first and totals cost for qty, spilling into
+// the next batch automatically once one runs out (mirrors the backend's FIFO logic).
+function fifoPricing(batches, qty) {
+    let remaining = qty;
+    let totalCost = 0;
+    for (const b of batches) {
+        if (remaining <= 0) break;
+        const take = Math.min(remaining, Number(b.qty_remaining));
+        if (take <= 0) continue;
+        totalCost += take * Number(b.selling_price);
+        remaining -= take;
+    }
+    return { totalCost, unitPrice: qty > 0 ? totalCost / qty : 0, fullyCovered: remaining <= 0 };
+}
+
+async function addItemToCart(itemId) {
+    const item = items.find(i => i.item_id === itemId);
+    const existing = cart.find(l => l.item_id === itemId && l.mode === 'fifo');
+    if (existing) {
+        existing.qty += 1;
+        recalcLine(existing);
+        renderCart();
+        return;
+    }
+
+    const availableBatches = await api(`/sales/available-batches/${itemId}`);
+    if (availableBatches.length === 0) return toast('No stock available for this item');
+
+    const line = {
         cart_key: cartKeyCounter++,
         item_id: itemId,
         item_name: item.name,
-        qty,
+        qty: 1,
         mode: 'fifo',
         batch_id: null,
-        batch_label: 'Auto (FIFO)',
-    });
+        unit_price: 0,
+        availableBatches,
+        itemTotalStock: Number(item.total_stock),
+    };
+    recalcLine(line);
+    cart.unshift(line);
     renderCart();
+}
+
+// Recomputes unit_price for a line based on its current mode/qty. Invalid qty
+// (non-whole, <=0, or beyond what's actually available) is stored as NaN, and
+// the line's own total then reads as NaN too - it doesn't silently guess.
+function recalcLine(line) {
+    const cap = line.mode === 'manual'
+        ? Number((line.availableBatches.find(b => b.batch_id === line.batch_id) || {}).qty_remaining || 0)
+        : line.itemTotalStock;
+
+    const isValidQty = Number.isInteger(line.qty) && line.qty > 0 && line.qty <= cap;
+    if (!isValidQty) {
+        line.qty = NaN;
+        line.unit_price = NaN;
+        return;
+    }
+
+    if (line.mode === 'manual') {
+        const batch = line.availableBatches.find(b => b.batch_id === line.batch_id);
+        line.unit_price = batch ? Number(batch.selling_price) : NaN;
+    } else {
+        const pricing = fifoPricing(line.availableBatches, line.qty);
+        line.unit_price = pricing.unitPrice;
+    }
+}
+
+function batchOptionsHtml(line) {
+    const autoSelected = line.mode === 'fifo' ? 'selected' : '';
+    const options = line.availableBatches.map(b => `
+        <option value="${b.batch_id}" ${line.mode === 'manual' && line.batch_id === b.batch_id ? 'selected' : ''}>
+            ${b.batch_ref_no} (stock: ${b.qty_remaining}) - Ksh ${b.selling_price}
+        </option>
+    `).join('');
+    return `<option value="auto" ${autoSelected}>Auto (FIFO)</option>${options}`;
 }
 
 function renderCart() {
     const body = document.getElementById('cartBody');
     if (cart.length === 0) {
         body.innerHTML = `<tr><td colspan="6"><div class="empty-state">Cart is empty</div></td></tr>`;
-        return;
+    } else {
+        body.innerHTML = cart.map(line => {
+            const qtyDisplay = Number.isNaN(line.qty) ? '' : line.qty;
+            const priceDisplay = Number.isNaN(line.unit_price) ? 'NaN' : line.unit_price.toFixed(2);
+            const totalDisplay = Number.isNaN(line.qty) || Number.isNaN(line.unit_price)
+                ? 'NaN' : (line.qty * line.unit_price).toFixed(2);
+            return `
+            <tr>
+                <td>${line.item_name}</td>
+                <td>
+                    <input class="mono ${Number.isNaN(line.qty) ? 'invalid-input' : ''}" type="number" step="1"
+                           value="${qtyDisplay}" placeholder="NaN" style="width:70px"
+                           onchange="setQty(${line.cart_key}, this.value)">
+                </td>
+                <td class="mono ${Number.isNaN(line.unit_price) ? 'invalid-input' : ''}">${priceDisplay}</td>
+                <td>
+                    <select onchange="setBatch(${line.cart_key}, this.value)">
+                        ${batchOptionsHtml(line)}
+                    </select>
+                </td>
+                <td class="mono ${totalDisplay === 'NaN' ? 'invalid-input' : ''}">${totalDisplay}</td>
+                <td><span class="cart-line-x" onclick="removeCartLine(${line.cart_key})">x</span></td>
+            </tr>
+        `;
+        }).join('');
     }
-    body.innerHTML = cart.map(line => `
-        <tr>
-            <td>${line.item_name}</td>
-            <td class="mono">${line.batch_label}</td>
-            <td class="mono">${line.qty}</td>
-            <td colspan="2"><em style="color:var(--text-muted); font-size:12.5px;">calculated at checkout</em></td>
-            <td>
-                <button class="secondary" onclick="openBatchModal(${line.cart_key})">Change Batch</button>
-                <button class="danger" onclick="removeCartLine(${line.cart_key})">X</button>
-            </td>
-        </tr>
-    `).join('');
+
+    const subtotal = cart.reduce((sum, l) => {
+        const lineTotal = l.qty * l.unit_price;
+        return sum + (Number.isNaN(lineTotal) ? 0 : lineTotal);
+    }, 0);
+    document.getElementById('subtotal').textContent = subtotal.toFixed(2);
+}
+
+function setQty(key, value) {
+    const line = cart.find(l => l.cart_key === key);
+    // Whole numbers only - anything else (decimals, blank, non-numeric) becomes NaN
+    const parsed = value.trim() === '' ? NaN : Number(value);
+    line.qty = Number.isInteger(parsed) ? parsed : NaN;
+    recalcLine(line);
+    renderCart();
+}
+
+async function setBatch(key, value) {
+    const line = cart.find(l => l.cart_key === key);
+    if (value === 'auto') {
+        line.mode = 'fifo';
+        line.batch_id = null;
+    } else {
+        line.mode = 'manual';
+        line.batch_id = Number(value);
+    }
+    // Refresh batch stock levels in case other sales happened since this line was added
+    line.availableBatches = await api(`/sales/available-batches/${line.item_id}`);
+    recalcLine(line);
+    renderCart();
 }
 
 function removeCartLine(key) {
@@ -116,42 +259,18 @@ function removeCartLine(key) {
     renderCart();
 }
 
-async function openBatchModal(cartKey) {
-    const line = cart.find(l => l.cart_key === cartKey);
-    modalTargetKey = cartKey;
-    const batches = await api(`/sales/available-batches/${line.item_id}`);
-    const body = document.getElementById('batchModalBody');
-    body.innerHTML = batches.map(b => `
-        <tr>
-            <td class="mono">${b.batch_ref_no}</td>
-            <td class="mono ${expiryClass(b.expiry_date)}">${b.expiry_date ? b.expiry_date.substring(0,10) : '-'}</td>
-            <td class="mono">${b.qty_remaining}</td>
-            <td class="mono">${b.selling_price}</td>
-            <td><button onclick="pickBatch(${b.batch_id}, '${b.batch_ref_no}')">Select</button></td>
-        </tr>
-    `).join('') || `<tr><td colspan="5"><div class="empty-state">No stock available for this item</div></td></tr>`;
-    document.getElementById('batchModal').style.display = 'block';
-}
-
-function pickBatch(batchId, refNo) {
-    const line = cart.find(l => l.cart_key === modalTargetKey);
-    line.mode = 'manual';
-    line.batch_id = batchId;
-    line.batch_label = `Batch ${refNo}`;
-    closeBatchModal();
+function clearInvoice() {
+    if (cart.length === 0) return;
+    if (!confirm('Cancel this invoice and clear all items from the cart?')) return;
+    cart = [];
     renderCart();
-}
-
-function closeBatchModal() {
-    document.getElementById('batchModal').style.display = 'none';
-    modalTargetKey = null;
 }
 
 async function checkout() {
     const invoice_no = document.getElementById('invoiceNo').value.trim();
     const amount_paid = Number(document.getElementById('amountPaid').value) || 0;
-    if (!invoice_no) return toast('Invoice number is required');
     if (cart.length === 0) return toast('Cart is empty');
+    if (cart.some(l => Number.isNaN(l.qty))) return toast('Fix the invalid quantity before completing the sale');
 
     const payload = {
         invoice_no,
@@ -161,15 +280,23 @@ async function checkout() {
 
     try {
         const result = await api('/sales', { method: 'POST', body: JSON.stringify(payload) });
-        toast(`Sale completed - total ${result.sale.total}`);
+        toast(`Sale ${result.sale.invoice_no} completed - total ${result.sale.total}`);
         cart = [];
         renderCart();
-        document.getElementById('invoiceNo').value = '';
         document.getElementById('amountPaid').value = 0;
+        init(); // refresh next invoice number suggestion + stock levels
     } catch (err) {
         toast(err.message);
     }
 }
+
+// Hide search results when clicking elsewhere on the page
+document.addEventListener('click', (e) => {
+    const wrap = document.querySelector('.item-search-wrap');
+    if (wrap && !wrap.contains(e.target)) {
+        document.getElementById('searchResults').style.display = 'none';
+    }
+});
 
 init();
 renderCart();
