@@ -35,16 +35,29 @@ router.get('/:id', async (req, res) => {
     }
 });
 
-// CREATE item
+// CREATE item. If no SKU is given, auto-assign one from the item's own id
+// (e.g. the 10th item ever registered gets "0010") - so every item always
+// has a code to search and sort by, even if the person skips the field.
 router.post('/', async (req, res) => {
     const { name, sku, category } = req.body;
     if (!name) return res.status(400).json({ error: 'Item name is required' });
     try {
-        const result = await pool.query(
+        const insertResult = await pool.query(
             'INSERT INTO items (name, sku, category) VALUES ($1, $2, $3) RETURNING *',
-            [name, sku || null, category || null]
+            [name, (sku && sku.trim()) || null, category || null]
         );
-        res.status(201).json(result.rows[0]);
+        let item = insertResult.rows[0];
+
+        if (!item.sku) {
+            const autoSku = String(item.item_id).padStart(4, '0');
+            const updateResult = await pool.query(
+                'UPDATE items SET sku = $1 WHERE item_id = $2 RETURNING *',
+                [autoSku, item.item_id]
+            );
+            item = updateResult.rows[0];
+        }
+
+        res.status(201).json(item);
     } catch (err) {
         console.error(err);
         res.status(500).json({ error: 'Failed to create item' });
