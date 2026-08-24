@@ -9,6 +9,33 @@ function computePaymentStatus(amountPaid, total) {
     return 'unpaid';
 }
 
+/**
+ * Generates the next purchase invoice number, e.g. PUR-0001, PUR-0002...
+ * Same trailing-digit approach as sales invoice numbers, so it keeps working
+ * correctly however the existing numbers were formatted.
+ */
+async function generateNextPurchaseInvoiceNo(client) {
+    const result = await client.query(
+        `SELECT MAX((regexp_match(purchase_invoice_no, '([0-9]+)$'))[1]::int) AS max_num
+         FROM purchases
+         WHERE purchase_invoice_no ~ '[0-9]+$'`
+    );
+    const maxNum = result.rows[0].max_num;
+    const nextNumber = maxNum ? maxNum + 1 : 1;
+    return `PUR-${String(nextNumber).padStart(4, '0')}`;
+}
+
+// GET the next purchase invoice number, read-only - used to prefill Add Purchase.
+router.get('/next-invoice-no', async (req, res) => {
+    try {
+        const next = await generateNextPurchaseInvoiceNo(pool);
+        res.json({ next_invoice_no: next });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Failed to compute next purchase invoice number' });
+    }
+});
+
 // GET all purchases (list view) - with balance computed for convenience
 router.get('/', async (req, res) => {
     try {
@@ -83,11 +110,12 @@ router.post('/', async (req, res) => {
         }
         const total = subtotal;
         const paymentStatus = computePaymentStatus(amount_paid, total);
+        const purchaseInvoiceNo = await generateNextPurchaseInvoiceNo(client);
 
         const purchaseResult = await client.query(
-            `INSERT INTO purchases (supplier, status, subtotal, total, amount_paid, payment_method, payment_status)
-             VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
-            [supplier || null, status, subtotal, total, amount_paid, payment_method, paymentStatus]
+            `INSERT INTO purchases (purchase_invoice_no, supplier, status, subtotal, total, amount_paid, payment_method, payment_status)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
+            [purchaseInvoiceNo, (supplier && supplier.trim()) || 'General Supplier', status, subtotal, total, amount_paid, payment_method, paymentStatus]
         );
         const purchase = purchaseResult.rows[0];
 
