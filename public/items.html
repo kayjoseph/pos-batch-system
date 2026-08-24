@@ -10,9 +10,18 @@
     <div id="sidebarMount"></div>
     <main class="content">
         <h1>Items</h1>
+
+        <div class="list-filter-bar">
+            <div class="field">
+                <label>Search</label>
+                <input id="filterQuery" placeholder="Search by item code or name..." oninput="applyFilters()">
+            </div>
+            <button class="secondary" onclick="clearFilters()">Clear</button>
+        </div>
+
         <table>
             <thead>
-                <tr><th>Name</th><th>SKU</th><th>Category</th><th>Total Stock</th><th>Actions</th></tr>
+                <tr><th>Item Code</th><th>Name</th><th>Category</th><th>Total Stock</th><th>Actions</th></tr>
             </thead>
             <tbody id="itemsBody"></tbody>
         </table>
@@ -23,17 +32,41 @@
 <script>
 renderSidebar('items-list');
 
+let items = [];
+
 async function loadItems() {
-    const items = await api('/items');
+    items = await api('/items');
+    applyFilters();
+}
+
+function applyFilters() {
+    const query = document.getElementById('filterQuery').value.trim().toLowerCase();
+    const filtered = query
+        ? items.filter(i =>
+            (i.sku || '').toLowerCase().includes(query) || i.name.toLowerCase().includes(query))
+        : items;
+    renderItems(filtered);
+}
+
+function clearFilters() {
+    document.getElementById('filterQuery').value = '';
+    applyFilters();
+}
+
+function renderItems(list) {
     const body = document.getElementById('itemsBody');
     if (items.length === 0) {
         body.innerHTML = `<tr><td colspan="5"><div class="empty-state">No items yet. <a href="items-register.html">Register your first item</a>.</div></td></tr>`;
         return;
     }
-    body.innerHTML = items.map(i => `
+    if (list.length === 0) {
+        body.innerHTML = `<tr><td colspan="5"><div class="empty-state">No items match this search.</div></td></tr>`;
+        return;
+    }
+    body.innerHTML = list.map(i => `
         <tr>
+            <td class="mono">${i.sku}</td>
             <td>${i.name}</td>
-            <td class="mono">${i.sku || '-'}</td>
             <td>${i.category || '-'}</td>
             <td class="mono">${i.total_stock}</td>
             <td>
