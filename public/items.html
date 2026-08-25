@@ -21,29 +21,65 @@
 
         <table>
             <thead>
-                <tr><th>Item Code</th><th>Name</th><th>Category</th><th>Total Stock</th><th>Actions</th></tr>
+                <tr><th>Item Code</th><th>Name</th><th>Category</th><th>Unit</th><th></th></tr>
             </thead>
             <tbody id="itemsBody"></tbody>
         </table>
     </main>
 </div>
+
+<!-- Edit Item modal -->
+<div id="editModal" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(15,20,28,0.5);">
+    <div class="card" style="max-width:400px; margin:100px auto;">
+        <h2 class="section-title">Edit Item Details</h2>
+        <div class="form-row">
+            <label>Name *</label><input id="editName" style="flex:1;">
+        </div>
+        <div class="form-row">
+            <label>SKU *</label><input id="editSku" style="flex:1;">
+        </div>
+        <div class="form-row">
+            <label>Category *</label>
+            <select id="editCategory" style="flex:1;"></select>
+        </div>
+        <div class="form-row">
+            <label>Unit *</label>
+            <select id="editUnit" style="flex:1;"></select>
+        </div>
+        <button onclick="submitEdit()">Save</button>
+        <button class="secondary" onclick="closeEditModal()">Cancel</button>
+    </div>
+</div>
+
+<!-- Delete confirm modal -->
+<div id="deleteModal" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(15,20,28,0.5);">
+    <div class="card" style="max-width:360px; margin:120px auto; text-align:center;">
+        <p style="font-size:14px; margin-bottom:18px;">Are you sure you want to delete Record</p>
+        <button class="danger" onclick="confirmDelete()">Yes</button>
+        <button class="secondary" onclick="closeDeleteModal()">Cancel</button>
+    </div>
+</div>
+
 <div id="toast"></div>
 <script src="js/common.js"></script>
 <script>
 renderSidebar('items-list');
 
 let items = [];
+let categories = [];
+let units = [];
+let editTargetId = null;
+let deleteTargetId = null;
 
 async function loadItems() {
-    items = await api('/items');
+    [items, categories, units] = await Promise.all([api('/items'), api('/categories'), api('/units')]);
     applyFilters();
 }
 
 function applyFilters() {
     const query = document.getElementById('filterQuery').value.trim().toLowerCase();
     const filtered = query
-        ? items.filter(i =>
-            (i.sku || '').toLowerCase().includes(query) || i.name.toLowerCase().includes(query))
+        ? items.filter(i => (i.sku || '').toLowerCase().includes(query) || i.name.toLowerCase().includes(query))
         : items;
     renderItems(filtered);
 }
@@ -68,22 +104,97 @@ function renderItems(list) {
             <td class="mono">${i.sku}</td>
             <td>${i.name}</td>
             <td>${i.category || '-'}</td>
-            <td class="mono">${i.total_stock}</td>
+            <td class="mono">${i.unit_short_name || '-'}</td>
             <td>
-                <button class="secondary" onclick="location.href='batches.html?item_id=${i.item_id}&name=${encodeURIComponent(i.name)}'">View Batches</button>
-                <button class="danger" onclick="deleteItem(${i.item_id})">Delete</button>
+                <div class="action-menu-wrap">
+                    <button class="secondary" onclick="toggleActionMenu(${i.item_id})">Action &#9662;</button>
+                    <div class="action-menu" id="action-menu-${i.item_id}">
+                        <div class="action-menu-item" onclick="openEditModal(${i.item_id})">Edit Item Details</div>
+                        <div class="action-menu-item danger" onclick="openDeleteModal(${i.item_id})">Delete</div>
+                    </div>
+                </div>
             </td>
         </tr>
     `).join('');
 }
 
-async function deleteItem(id) {
-    if (!confirm('Delete this item?')) return;
+function toggleActionMenu(id) {
+    const menu = document.getElementById(`action-menu-${id}`);
+    const isOpen = menu.classList.contains('open');
+    document.querySelectorAll('.action-menu.open').forEach(m => m.classList.remove('open'));
+    if (!isOpen) menu.classList.add('open');
+}
+
+document.addEventListener('click', (e) => {
+    if (!e.target.closest('.action-menu-wrap')) {
+        document.querySelectorAll('.action-menu.open').forEach(m => m.classList.remove('open'));
+    }
+});
+
+// ============ Edit ============
+function openEditModal(id) {
+    const item = items.find(i => i.item_id === id);
+    editTargetId = id;
+
+    document.getElementById('editName').value = item.name;
+    document.getElementById('editSku').value = item.sku;
+
+    document.getElementById('editCategory').innerHTML = categories
+        .map(c => `<option value="${c.category_id}" ${c.category_id === item.category_id ? 'selected' : ''}>${c.name}</option>`)
+        .join('');
+    document.getElementById('editUnit').innerHTML = units
+        .map(u => `<option value="${u.unit_id}" ${u.unit_id === item.unit_id ? 'selected' : ''}>${u.name} (${u.short_name})</option>`)
+        .join('');
+
+    document.getElementById('editModal').style.display = 'block';
+}
+
+function closeEditModal() {
+    document.getElementById('editModal').style.display = 'none';
+    editTargetId = null;
+}
+
+async function submitEdit() {
+    const name = document.getElementById('editName').value.trim();
+    const sku = document.getElementById('editSku').value.trim();
+    const category_id = Number(document.getElementById('editCategory').value);
+    const unit_id = Number(document.getElementById('editUnit').value);
+
+    if (!name) return toast('Item name is required');
+    if (!sku) return toast('SKU is required');
+    if (!category_id) return toast('Category is required');
+    if (!unit_id) return toast('Unit of measure is required');
+
     try {
-        await api(`/items/${id}`, { method: 'DELETE' });
-        toast('Item deleted');
+        await api(`/items/${editTargetId}`, {
+            method: 'PUT',
+            body: JSON.stringify({ name, sku, category_id, unit_id }),
+        });
+        toast('Item updated');
+        closeEditModal();
         loadItems();
     } catch (err) {
+        toast(err.message);
+    }
+}
+
+// ============ Delete ============
+function openDeleteModal(id) {
+    deleteTargetId = id;
+    document.getElementById('deleteModal').style.display = 'block';
+}
+function closeDeleteModal() {
+    document.getElementById('deleteModal').style.display = 'none';
+    deleteTargetId = null;
+}
+async function confirmDelete() {
+    try {
+        const result = await api(`/items/${deleteTargetId}`, { method: 'DELETE' });
+        toast(result.message || 'Item deleted successfully!');
+        closeDeleteModal();
+        loadItems();
+    } catch (err) {
+        closeDeleteModal();
         toast(err.message);
     }
 }
