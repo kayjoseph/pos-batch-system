@@ -32,7 +32,7 @@ function expiryClass(dateStr) {
 
 /* ============ Sidebar ============ */
 // activePage one of:
-// 'items-register', 'items-list', 'purchase-add', 'purchase-list',
+// 'items-register', 'items-list', 'categories', 'purchase-add', 'purchase-list',
 // 'pos-terminal', 'invoice', 'sales'
 function renderSidebar(activePage) {
     const icons = {
@@ -43,7 +43,7 @@ function renderSidebar(activePage) {
         chevron: '<svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>',
     };
 
-    const itemsOpen = activePage === 'items-register' || activePage === 'items-list';
+    const itemsOpen = activePage === 'items-register' || activePage === 'items-list' || activePage === 'categories';
     const purchaseOpen = activePage === 'purchase-add' || activePage === 'purchase-list';
     const posOpen = activePage === 'pos-terminal' || activePage === 'invoice';
 
@@ -58,6 +58,7 @@ function renderSidebar(activePage) {
             <div class="nav-sublist ${itemsOpen ? 'open' : ''}" id="itemsSublist">
                 <a class="nav-sublink ${activePage === 'items-register' ? 'active' : ''}" href="items-register.html">Register Item</a>
                 <a class="nav-sublink ${activePage === 'items-list' ? 'active' : ''}" href="items.html">Items List</a>
+                <a class="nav-sublink ${activePage === 'categories' ? 'active' : ''}" href="categories.html">Categories</a>
             </div>
         </div>
 
