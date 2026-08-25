@@ -13,19 +13,26 @@
 
         <div class="card" style="max-width:480px;">
             <div class="form-row">
-                <label>Name</label><input id="name" placeholder="e.g. Paracetamol 500mg" style="flex:1;">
+                <label>Name *</label><input id="name" placeholder="e.g. Paracetamol 500mg" style="flex:1;">
             </div>
             <div class="form-row">
-                <label>SKU</label><input id="sku" placeholder="optional - auto-generated if left blank" style="flex:1;">
+                <label>SKU *</label><input id="sku" placeholder="e.g. PARA500" style="flex:1;">
             </div>
             <div class="form-row">
-                <label>Category</label>
+                <label>Category *</label>
                 <select id="category" style="flex:1;">
-                    <option value="">-- none --</option>
+                    <option value="">-- select --</option>
+                </select>
+            </div>
+            <div class="form-row">
+                <label>Unit of Measure *</label>
+                <select id="unit" style="flex:1;">
+                    <option value="">-- select --</option>
                 </select>
             </div>
             <p style="font-size:12px; color:var(--text-muted); margin:-4px 0 12px 128px;">
-                Don't see the category you need? <a href="categories.html">Add one here</a> first.
+                All fields are required. No category or unit yet? <a href="categories.html">Add a category</a> or
+                <a href="units.html">add a unit</a> first.
             </p>
             <button onclick="createItem()">Save Item</button>
         </div>
@@ -37,21 +44,33 @@
 renderSidebar('items-register');
 
 async function init() {
-    const categories = await api('/categories');
-    const select = document.getElementById('category');
-    select.innerHTML = '<option value="">-- none --</option>' +
+    const [categories, units] = await Promise.all([api('/categories'), api('/units')]);
+
+    const categorySelect = document.getElementById('category');
+    categorySelect.innerHTML = '<option value="">-- select --</option>' +
         categories.map(c => `<option value="${c.category_id}">${c.name}</option>`).join('');
+
+    const unitSelect = document.getElementById('unit');
+    unitSelect.innerHTML = '<option value="">-- select --</option>' +
+        units.map(u => `<option value="${u.unit_id}" ${u.name === 'Piece' ? 'selected' : ''}>${u.name} (${u.short_name})</option>`).join('');
 }
 
 async function createItem() {
     const name = document.getElementById('name').value.trim();
     const sku = document.getElementById('sku').value.trim();
-    const categoryValue = document.getElementById('category').value;
-    const category_id = categoryValue ? Number(categoryValue) : null;
+    const category_id = document.getElementById('category').value;
+    const unit_id = document.getElementById('unit').value;
+
     if (!name) return toast('Item name is required');
+    if (!sku) return toast('SKU is required');
+    if (!category_id) return toast('Category is required');
+    if (!unit_id) return toast('Unit of measure is required');
+
     try {
-        await api('/items', { method: 'POST', body: JSON.stringify({ name, sku, category_id }) });
-        // Same pattern as the batch view redirect - land on the list right after saving
+        await api('/items', {
+            method: 'POST',
+            body: JSON.stringify({ name, sku, category_id: Number(category_id), unit_id: Number(unit_id) }),
+        });
         window.location.href = 'items.html';
     } catch (err) {
         toast(err.message);
