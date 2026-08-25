@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Units of Measure - POS Batch System</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="app">
+    <div id="sidebarMount"></div>
+    <main class="content">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+            <h1 style="margin:0;">Units of Measure</h1>
+            <button onclick="openAddModal()">+ Add Unit</button>
+        </div>
+
+        <table>
+            <thead>
+                <tr><th>Name</th><th>Short Name</th></tr>
+            </thead>
+            <tbody id="unitsBody"></tbody>
+        </table>
+    </main>
+</div>
+
+<div id="addModal" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(15,20,28,0.5);">
+    <div class="card" style="max-width:360px; margin:120px auto;">
+        <h2 class="section-title">Add Unit of Measure</h2>
+        <div class="form-row">
+            <label>Name</label><input id="newUnitName" placeholder="e.g. Kilogram" style="flex:1;">
+        </div>
+        <div class="form-row">
+            <label>Short Name</label><input id="newUnitShort" placeholder="e.g. Kg" style="flex:1;">
+        </div>
+        <button onclick="saveUnit()">Save</button>
+        <button class="secondary" onclick="closeAddModal()">Cancel</button>
+    </div>
+</div>
+
+<div id="toast"></div>
+<script src="js/common.js"></script>
+<script>
+renderSidebar('units');
+
+async function loadUnits() {
+    const units = await api('/units');
+    const body = document.getElementById('unitsBody');
+    if (units.length === 0) {
+        body.innerHTML = `<tr><td colspan="2"><div class="empty-state">No units yet. Click "+ Add Unit" to create one.</div></td></tr>`;
+        return;
+    }
+    body.innerHTML = units.map(u => `
+        <tr>
+            <td>${u.name}</td>
+            <td class="mono">${u.short_name}</td>
+        </tr>
+    `).join('');
+}
+
+function openAddModal() {
+    document.getElementById('newUnitName').value = '';
+    document.getElementById('newUnitShort').value = '';
+    document.getElementById('addModal').style.display = 'block';
+}
+function closeAddModal() {
+    document.getElementById('addModal').style.display = 'none';
+}
+async function saveUnit() {
+    const name = document.getElementById('newUnitName').value.trim();
+    const short_name = document.getElementById('newUnitShort').value.trim();
+    if (!name || !short_name) return toast('Both fields are required');
+    try {
+        await api('/units', { method: 'POST', body: JSON.stringify({ name, short_name }) });
+        toast('Unit added');
+        closeAddModal();
+        loadUnits();
+    } catch (err) {
+        toast(err.message);
+    }
+}
+
+loadUnits();
+</script>
+</body>
+</html>
