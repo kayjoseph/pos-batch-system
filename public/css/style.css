@@ -104,7 +104,7 @@ body {
     overflow: hidden;
     transition: max-height 0.18s ease;
 }
-.nav-sublist.open { max-height: 200px; }
+.nav-sublist.open { max-height: 320px; }
 .nav-sublink {
     display: block;
     padding: 8px 10px 8px 39px;
