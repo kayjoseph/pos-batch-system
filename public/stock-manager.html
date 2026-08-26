@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Stock Manager - POS Batch System</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="app">
+    <div id="sidebarMount"></div>
+    <main class="content">
+        <h1>Stock Manager</h1>
+
+        <div class="list-filter-bar">
+            <div class="field">
+                <label>Search</label>
+                <input id="filterQuery" placeholder="Search by item code or name..." oninput="applyFilters()">
+            </div>
+            <button class="secondary" onclick="clearFilters()">Clear</button>
+        </div>
+
+        <table>
+            <thead>
+                <tr><th>Item Code</th><th>Name</th><th>Category</th><th>Unit</th><th>Total Stock</th><th></th></tr>
+            </thead>
+            <tbody id="itemsBody"></tbody>
+        </table>
+    </main>
+</div>
+
+<!-- Batch adjustment window -->
+<div id="batchModal" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(15,20,28,0.5);">
+    <div class="card" style="max-width:640px; margin:70px auto;">
+        <h2 class="section-title" id="batchModalTitle">Batches</h2>
+        <table>
+            <thead>
+                <tr><th>Batch Ref</th><th>Expiry</th><th>Selling Price</th><th>Qty Remaining</th><th></th></tr>
+            </thead>
+            <tbody id="batchModalBody"></tbody>
+        </table>
+        <button class="secondary" onclick="closeBatchModal()" style="margin-top:14px;">Close</button>
+    </div>
+</div>
+
+<div id="toast"></div>
+<script src="js/common.js"></script>
+<script>
+renderSidebar('stock-manager');
+
+let items = [];
+let batchModalItemId = null;
+
+async function loadItems() {
+    items = await api('/items');
+    // Newest registered item first
+    items.sort((a, b) => b.item_id - a.item_id);
+    applyFilters();
+}
+
+function applyFilters() {
+    const query = document.getElementById('filterQuery').value.trim().toLowerCase();
+    const filtered = query
+        ? items.filter(i => (i.sku || '').toLowerCase().includes(query) || i.name.toLowerCase().includes(query))
+        : items;
+    renderItems(filtered);
+}
+
+function clearFilters() {
+    document.getElementById('filterQuery').value = '';
+    applyFilters();
+}
+
+function renderItems(list) {
+    const body = document.getElementById('itemsBody');
+    if (items.length === 0) {
+        body.innerHTML = `<tr><td colspan="6"><div class="empty-state">No items yet.</div></td></tr>`;
+        return;
+    }
+    if (list.length === 0) {
+        body.innerHTML = `<tr><td colspan="6"><div class="empty-state">No items match this search.</div></td></tr>`;
+        return;
+    }
+    body.innerHTML = list.map(i => `
+        <tr>
+            <td class="mono">${i.sku}</td>
+            <td>${i.name}</td>
+            <td>${i.category || '-'}</td>
+            <td class="mono">${i.unit_short_name || '-'}</td>
+            <td class="mono">${i.total_stock}</td>
+            <td><button class="secondary" onclick="openBatchModal(${i.item_id}, '${i.name.replace(/'/g, "\\'")}')">Adjust Stock</button></td>
+        </tr>
+    `).join('');
+}
+
+async function openBatchModal(itemId, itemName) {
+    batchModalItemId = itemId;
+    document.getElementById('batchModalTitle').textContent = `Batches - ${itemName}`;
+    await loadBatchModalRows();
+    document.getElementById('batchModal').style.display = 'block';
+}
+
+async function loadBatchModalRows() {
+    const batches = await api(`/batches/item/${batchModalItemId}`);
+    const body = document.getElementById('batchModalBody');
+    body.innerHTML = batches.map(b => `
+        <tr>
+            <td class="mono">${b.batch_ref_no}</td>
+            <td class="mono ${expiryClass(b.expiry_date)}">${b.expiry_date ? b.expiry_date.substring(0,10) : '-'}</td>
+            <td><input type="number" step="0.01" id="sp-${b.batch_id}" value="${b.selling_price}" style="width:90px"></td>
+            <td><input type="number" step="1" id="qty-${b.batch_id}" value="${b.qty_remaining}" style="width:80px"></td>
+            <td><button onclick="saveBatch(${b.batch_id})">Save</button></td>
+        </tr>
+    `).join('') || `<tr><td colspan="5"><div class="empty-state">No batches recorded yet for this item.</div></td></tr>`;
+}
+
+async function saveBatch(batchId) {
+    const selling_price = document.getElementById(`sp-${batchId}`).value;
+    const newQtyRemaining = Number(document.getElementById(`qty-${batchId}`).value);
+    try {
+        await api(`/batches/${batchId}`, { method: 'PUT', body: JSON.stringify({ selling_price }) });
+        await api(`/batches/${batchId}/adjust`, { method: 'PATCH', body: JSON.stringify({ newQtyRemaining }) });
+        toast('Batch updated');
+        await loadBatchModalRows();
+        loadItems(); // refresh total_stock in the background table
+    } catch (err) {
+        toast(err.message);
+    }
+}
+
+function closeBatchModal() {
+    document.getElementById('batchModal').style.display = 'none';
+    batchModalItemId = null;
+}
+
+loadItems();
+</script>
+</body>
+</html>
