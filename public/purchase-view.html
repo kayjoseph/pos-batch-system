@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Purchase Detail - POS Batch System</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="app">
+    <div id="sidebarMount"></div>
+    <main class="content">
+        <a class="back-link" href="purchase.html">&larr; Back to Purchase List</a>
+
+        <div class="doc-card">
+            <div class="doc-header">
+                <div>
+                    <h1 id="docTitle">Purchase</h1>
+                    <div class="doc-number" id="docDate"></div>
+                </div>
+                <span class="badge" id="statusBadge"></span>
+            </div>
+
+            <div class="doc-meta-grid">
+                <div class="doc-meta-block">
+                    <dt>Supplier</dt><dd id="metaSupplier">-</dd>
+                    <dt>Purchase Invoice No.</dt><dd id="metaInvoice">-</dd>
+                </div>
+                <div class="doc-meta-block">
+                    <dt>Payment Method</dt><dd id="metaMethod">-</dd>
+                    <dt>Amount Paid / Balance</dt><dd id="metaPaidBalance">-</dd>
+                </div>
+            </div>
+
+            <table>
+                <thead>
+                    <tr><th>Item</th><th>Batch Ref</th><th>Qty</th><th>Cost Price</th><th>Selling Price</th><th>Received</th></tr>
+                </thead>
+                <tbody id="linesBody"></tbody>
+            </table>
+
+            <div class="doc-totals">
+                <div><span>Subtotal</span><span class="mono" id="subtotalAmount">0.00</span></div>
+                <div class="grand"><span>Total</span><span class="mono" id="totalAmount">0.00</span></div>
+            </div>
+
+            <div class="doc-actions">
+                <button class="secondary" disabled title="Coming soon">Download PDF</button>
+            </div>
+        </div>
+    </main>
+</div>
+<div id="toast"></div>
+<script src="js/common.js"></script>
+<script>
+renderSidebar('purchase-list');
+
+const purchaseId = new URLSearchParams(location.search).get('id');
+
+async function load() {
+    if (!purchaseId) return toast('No purchase specified');
+    try {
+        const purchase = await api(`/purchases/${purchaseId}`);
+        const invoiceLabel = purchase.purchase_invoice_no || `#${purchase.purchase_id}`;
+        document.getElementById('docTitle').textContent = `Purchase ${invoiceLabel}`;
+        document.getElementById('docDate').textContent = new Date(purchase.purchase_date).toLocaleString();
+        document.getElementById('statusBadge').textContent = purchase.status === 'lpo' ? 'LPO' : 'Received';
+        document.getElementById('statusBadge').className = `badge ${purchase.status}`;
+        document.getElementById('metaSupplier').textContent = purchase.supplier || '-';
+        document.getElementById('metaInvoice').textContent = invoiceLabel;
+        document.getElementById('metaMethod').textContent = purchase.payment_method || '-';
+        document.getElementById('metaPaidBalance').textContent =
+            `Ksh ${purchase.amount_paid} / Ksh ${purchase.balance}`;
+
+        document.getElementById('linesBody').innerHTML = purchase.lines.map(l => `
+            <tr>
+                <td>${l.item_name}</td>
+                <td class="mono">${l.batch_ref_no || '-'}</td>
+                <td class="mono">${l.qty}</td>
+                <td class="mono">${l.cost_price}</td>
+                <td class="mono">${l.selling_price}</td>
+                <td>${l.received ? '<span class="badge paid">Yes</span>' : '<span class="badge unpaid">No</span>'}</td>
+            </tr>
+        `).join('');
+
+        document.getElementById('subtotalAmount').textContent = purchase.subtotal;
+        document.getElementById('totalAmount').textContent = purchase.total;
+    } catch (err) {
+        toast(err.message);
+    }
+}
+
+load();
+</script>
+</body>
+</html>
