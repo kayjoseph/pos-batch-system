@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Categories - POS Batch System</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="app">
+    <div id="sidebarMount"></div>
+    <main class="content">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+            <h1 style="margin:0;">Categories</h1>
+            <button onclick="openAddModal()">+ Add Category</button>
+        </div>
+
+        <table>
+            <thead>
+                <tr><th>Category Code</th><th>Category Name</th><th>Items Registered</th><th>Action</th></tr>
+            </thead>
+            <tbody id="categoriesBody"></tbody>
+        </table>
+    </main>
+</div>
+
+<!-- Add Category modal -->
+<div id="addModal" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(15,20,28,0.5);">
+    <div class="card" style="max-width:360px; margin:120px auto;">
+        <h2 class="section-title">Add Category</h2>
+        <div class="form-row">
+            <label>Name</label><input id="newCategoryName" placeholder="e.g. Beverages" style="flex:1;">
+        </div>
+        <button onclick="saveCategory()">Save</button>
+        <button class="secondary" onclick="closeAddModal()">Cancel</button>
+    </div>
+</div>
+
+<!-- Edit Category modal -->
+<div id="editModal" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(15,20,28,0.5);">
+    <div class="card" style="max-width:360px; margin:120px auto;">
+        <h2 class="section-title">Edit Category</h2>
+        <div class="form-row">
+            <label>Name</label><input id="editCategoryName" style="flex:1;">
+        </div>
+        <button onclick="submitEdit()">Save</button>
+        <button class="secondary" onclick="closeEditModal()">Cancel</button>
+    </div>
+</div>
+
+<!-- Delete confirm modal -->
+<div id="deleteModal" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(15,20,28,0.5);">
+    <div class="card" style="max-width:360px; margin:120px auto; text-align:center;">
+        <p style="font-size:14px; margin-bottom:18px;">Are you sure you want to delete Record?</p>
+        <button class="danger" onclick="confirmDelete()">Yes</button>
+        <button class="secondary" onclick="closeDeleteModal()">Cancel</button>
+    </div>
+</div>
+
+<div id="toast"></div>
+<script src="js/common.js"></script>
+<script>
+renderSidebar('categories');
+
+let categories = [];
+let editTargetId = null;
+let deleteTargetId = null;
+
+async function loadCategories() {
+    categories = await api('/categories');
+    renderCategories();
+}
+
+function renderCategories() {
+    const body = document.getElementById('categoriesBody');
+    if (categories.length === 0) {
+        body.innerHTML = `<tr><td colspan="4"><div class="empty-state">No categories yet. Click "+ Add Category" to create one.</div></td></tr>`;
+        return;
+    }
+    body.innerHTML = categories.map(c => `
+        <tr>
+            <td class="mono">${c.category_code}</td>
+            <td>${c.name}</td>
+            <td class="mono">${c.item_count}</td>
+            <td>
+                <div class="action-menu-wrap">
+                    <button class="secondary" onclick="toggleActionMenu(${c.category_id})">Actions &#9662;</button>
+                    <div class="action-menu" id="action-menu-${c.category_id}">
+                        <div class="action-menu-item" onclick="openEditModal(${c.category_id}, '${c.name.replace(/'/g, "\\'")}')">Edit</div>
+                        <div class="action-menu-item danger" onclick="openDeleteModal(${c.category_id})">Delete</div>
+                    </div>
+                </div>
+            </td>
+        </tr>
+    `).join('');
+}
+
+function toggleActionMenu(id) {
+    const menu = document.getElementById(`action-menu-${id}`);
+    const isOpen = menu.classList.contains('open');
+    document.querySelectorAll('.action-menu.open').forEach(m => m.classList.remove('open'));
+    if (!isOpen) menu.classList.add('open');
+}
+
+document.addEventListener('click', (e) => {
+    if (!e.target.closest('.action-menu-wrap')) {
+        document.querySelectorAll('.action-menu.open').forEach(m => m.classList.remove('open'));
+    }
+});
+
+// ============ Add ============
+function openAddModal() {
+    document.getElementById('newCategoryName').value = '';
+    document.getElementById('addModal').style.display = 'block';
+}
+function closeAddModal() {
+    document.getElementById('addModal').style.display = 'none';
+}
+async function saveCategory() {
+    const name = document.getElementById('newCategoryName').value.trim();
+    if (!name) return toast('Enter a category name');
+    try {
+        await api('/categories', { method: 'POST', body: JSON.stringify({ name }) });
+        toast('Category added');
+        closeAddModal();
+        loadCategories();
+    } catch (err) {
+        toast(err.message);
+    }
+}
+
+// ============ Edit ============
+function openEditModal(id, currentName) {
+    editTargetId = id;
+    document.getElementById('editCategoryName').value = currentName;
+    document.getElementById('editModal').style.display = 'block';
+}
+function closeEditModal() {
+    document.getElementById('editModal').style.display = 'none';
+    editTargetId = null;
+}
+async function submitEdit() {
+    const name = document.getElementById('editCategoryName').value.trim();
+    if (!name) return toast('Enter a category name');
+    try {
+        await api(`/categories/${editTargetId}`, { method: 'PUT', body: JSON.stringify({ name }) });
+        toast('Category updated');
+        closeEditModal();
+        loadCategories();
+    } catch (err) {
+        toast(err.message);
+    }
+}
+
+// ============ Delete ============
+function openDeleteModal(id) {
+    deleteTargetId = id;
+    document.getElementById('deleteModal').style.display = 'block';
+}
+function closeDeleteModal() {
+    document.getElementById('deleteModal').style.display = 'none';
+    deleteTargetId = null;
+}
+async function confirmDelete() {
+    try {
+        const result = await api(`/categories/${deleteTargetId}`, { method: 'DELETE' });
+        toast(result.message || 'Category deleted successfully!');
+        closeDeleteModal();
+        loadCategories();
+    } catch (err) {
+        closeDeleteModal();
+        toast(err.message);
+    }
+}
+
+loadCategories();
+</script>
+</body>
+</html>
