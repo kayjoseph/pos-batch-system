@@ -16,13 +16,14 @@
 
         <table>
             <thead>
-                <tr><th>Name</th><th>Short Name</th></tr>
+                <tr><th>Unit Code</th><th>Name</th><th>Short Name</th><th>Items Tied</th><th></th></tr>
             </thead>
             <tbody id="unitsBody"></tbody>
         </table>
     </main>
 </div>
 
+<!-- Add Unit modal -->
 <div id="addModal" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(15,20,28,0.5);">
     <div class="card" style="max-width:360px; margin:120px auto;">
         <h2 class="section-title">Add Unit of Measure</h2>
@@ -37,26 +38,85 @@
     </div>
 </div>
 
+<!-- Edit Unit modal -->
+<div id="editModal" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(15,20,28,0.5);">
+    <div class="card" style="max-width:360px; margin:120px auto;">
+        <h2 class="section-title">Edit Unit of Measure</h2>
+        <div class="form-row">
+            <label>Name</label><input id="editUnitName" style="flex:1;">
+        </div>
+        <div class="form-row">
+            <label>Short Name</label><input id="editUnitShort" style="flex:1;">
+        </div>
+        <button onclick="submitEdit()">Save</button>
+        <button class="secondary" onclick="closeEditModal()">Cancel</button>
+    </div>
+</div>
+
+<!-- Delete confirm modal -->
+<div id="deleteModal" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(15,20,28,0.5);">
+    <div class="card" style="max-width:360px; margin:120px auto; text-align:center;">
+        <p style="font-size:14px; margin-bottom:18px;">Are you sure you want to delete Record</p>
+        <button class="danger" onclick="confirmDelete()">Yes</button>
+        <button class="secondary" onclick="closeDeleteModal()">Cancel</button>
+    </div>
+</div>
+
 <div id="toast"></div>
 <script src="js/common.js"></script>
 <script>
 renderSidebar('units');
 
+let units = [];
+let editTargetId = null;
+let deleteTargetId = null;
+
 async function loadUnits() {
-    const units = await api('/units');
+    units = await api('/units');
+    renderUnits();
+}
+
+function renderUnits() {
     const body = document.getElementById('unitsBody');
     if (units.length === 0) {
-        body.innerHTML = `<tr><td colspan="2"><div class="empty-state">No units yet. Click "+ Add Unit" to create one.</div></td></tr>`;
+        body.innerHTML = `<tr><td colspan="5"><div class="empty-state">No units yet. Click "+ Add Unit" to create one.</div></td></tr>`;
         return;
     }
     body.innerHTML = units.map(u => `
         <tr>
+            <td class="mono">${u.unit_code}</td>
             <td>${u.name}</td>
             <td class="mono">${u.short_name}</td>
+            <td class="mono">${u.item_count}</td>
+            <td>
+                <div class="action-menu-wrap">
+                    <button class="secondary" onclick="toggleActionMenu(${u.unit_id})">Action &#9662;</button>
+                    <div class="action-menu" id="action-menu-${u.unit_id}">
+                        <div class="action-menu-item" onclick="openEditModal(${u.unit_id})">Edit</div>
+                        <div class="action-menu-item danger" onclick="openDeleteModal(${u.unit_id})">Delete</div>
+                    </div>
+                </div>
+            </td>
         </tr>
     `).join('');
 }
 
+function toggleActionMenu(id) {
+    const menu = document.getElementById(`action-menu-${id}`);
+    const isOpen = menu.classList.contains('open');
+    document.querySelectorAll('.action-menu.open').forEach(m => m.classList.remove('open'));
+    if (!isOpen) menu.classList.add('open');
+}
+
+function closeAllActionMenus() {
+    document.querySelectorAll('.action-menu.open').forEach(m => m.classList.remove('open'));
+}
+
+document.addEventListener('click', (e) => {
+    if (!e.target.closest('.action-menu-wrap')) closeAllActionMenus();
+});
+
+// ============ Add ============
 function openAddModal() {
     document.getElementById('newUnitName').value = '';
     document.getElementById('newUnitShort').value = '';
@@ -75,6 +135,55 @@ async function saveUnit() {
         closeAddModal();
         loadUnits();
     } catch (err) {
+        toast(err.message);
+    }
+}
+
+// ============ Edit ============
+function openEditModal(id) {
+    closeAllActionMenus();
+    const unit = units.find(u => u.unit_id === id);
+    editTargetId = id;
+    document.getElementById('editUnitName').value = unit.name;
+    document.getElementById('editUnitShort').value = unit.short_name;
+    document.getElementById('editModal').style.display = 'block';
+}
+function closeEditModal() {
+    document.getElementById('editModal').style.display = 'none';
+    editTargetId = null;
+}
+async function submitEdit() {
+    const name = document.getElementById('editUnitName').value.trim();
+    const short_name = document.getElementById('editUnitShort').value.trim();
+    if (!name || !short_name) return toast('Both fields are required');
+    try {
+        await api(`/units/${editTargetId}`, { method: 'PUT', body: JSON.stringify({ name, short_name }) });
+        toast('Unit updated');
+        closeEditModal();
+        loadUnits();
+    } catch (err) {
+        toast(err.message);
+    }
+}
+
+// ============ Delete ============
+function openDeleteModal(id) {
+    closeAllActionMenus();
+    deleteTargetId = id;
+    document.getElementById('deleteModal').style.display = 'block';
+}
+function closeDeleteModal() {
+    document.getElementById('deleteModal').style.display = 'none';
+    deleteTargetId = null;
+}
+async function confirmDelete() {
+    try {
+        const result = await api(`/units/${deleteTargetId}`, { method: 'DELETE' });
+        toast(result.message || 'Unit deleted successfully!');
+        closeDeleteModal();
+        loadUnits();
+    } catch (err) {
+        closeDeleteModal();
         toast(err.message);
     }
 }
