@@ -16,7 +16,7 @@
                 <label>Name *</label><input id="name" placeholder="e.g. Paracetamol 500mg" style="flex:1;">
             </div>
             <div class="form-row">
-                <label>SKU *</label><input id="sku" placeholder="e.g. PARA500" style="flex:1;">
+                <label>SKU</label><input id="sku" placeholder="optional" style="flex:1;">
             </div>
             <div class="form-row">
                 <label>Category *</label>
@@ -31,7 +31,8 @@
                 </select>
             </div>
             <p style="font-size:12px; color:var(--text-muted); margin:-4px 0 12px 128px;">
-                All fields are required. No category or unit yet? <a href="categories.html">Add a category</a> or
+                Name, category and unit are required. An item code is assigned automatically.
+                No category or unit yet? <a href="categories.html">Add a category</a> or
                 <a href="units.html">add a unit</a> first.
             </p>
             <button onclick="createItem()">Save Item</button>
@@ -62,7 +63,6 @@ async function createItem() {
     const unit_id = document.getElementById('unit').value;
 
     if (!name) return toast('Item name is required');
-    if (!sku) return toast('SKU is required');
     if (!category_id) return toast('Category is required');
     if (!unit_id) return toast('Unit of measure is required');
 
