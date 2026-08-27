@@ -21,7 +21,7 @@
 
         <table>
             <thead>
-                <tr><th>Item Code</th><th>Name</th><th>Category</th><th>Unit</th><th>Total Stock</th><th></th></tr>
+                <tr><th>Item Code</th><th>SKU</th><th>Name</th><th>Category</th><th>Unit</th><th>Total Stock</th><th></th></tr>
             </thead>
             <tbody id="itemsBody"></tbody>
         </table>
@@ -42,10 +42,24 @@
     </div>
 </div>
 
+<!-- Edit Name window -->
+<div id="editNameModal" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(15,20,28,0.5);">
+    <div class="card" style="max-width:360px; margin:120px auto;">
+        <h2 class="section-title">Edit Item Name</h2>
+        <div class="form-row">
+            <label>Name</label><input id="editNameInput" style="flex:1;">
+        </div>
+        <button onclick="submitEditName()">Save</button>
+        <button class="secondary" onclick="closeEditNameModal()">Cancel</button>
+    </div>
+</div>
+
 <div id="toast"></div>
 <script src="js/common.js"></script>
 <script>
 renderSidebar('stock-manager');
+
+let editNameTargetId = null;
 
 let items = [];
 let batchModalItemId = null;
@@ -60,7 +74,10 @@ async function loadItems() {
 function applyFilters() {
     const query = document.getElementById('filterQuery').value.trim().toLowerCase();
     const filtered = query
-        ? items.filter(i => (i.sku || '').toLowerCase().includes(query) || i.name.toLowerCase().includes(query))
+        ? items.filter(i =>
+            (i.item_code || '').toLowerCase().includes(query) ||
+            (i.sku || '').toLowerCase().includes(query) ||
+            i.name.toLowerCase().includes(query))
         : items;
     renderItems(filtered);
 }
@@ -73,21 +90,25 @@ function clearFilters() {
 function renderItems(list) {
     const body = document.getElementById('itemsBody');
     if (items.length === 0) {
-        body.innerHTML = `<tr><td colspan="6"><div class="empty-state">No items yet.</div></td></tr>`;
+        body.innerHTML = `<tr><td colspan="7"><div class="empty-state">No items yet.</div></td></tr>`;
         return;
     }
     if (list.length === 0) {
-        body.innerHTML = `<tr><td colspan="6"><div class="empty-state">No items match this search.</div></td></tr>`;
+        body.innerHTML = `<tr><td colspan="7"><div class="empty-state">No items match this search.</div></td></tr>`;
         return;
     }
     body.innerHTML = list.map(i => `
         <tr>
-            <td class="mono">${i.sku}</td>
+            <td class="mono">${i.item_code}</td>
+            <td class="mono">${i.sku || '-'}</td>
             <td>${i.name}</td>
             <td>${i.category || '-'}</td>
             <td class="mono">${i.unit_short_name || '-'}</td>
             <td class="mono">${i.total_stock}</td>
-            <td><button class="secondary" onclick="openBatchModal(${i.item_id}, '${i.name.replace(/'/g, "\\'")}')">Adjust Stock</button></td>
+            <td>
+                <button class="secondary" onclick="openBatchModal(${i.item_id}, '${i.name.replace(/'/g, "\\'")}')">Adjust Stock</button>
+                <button class="secondary" onclick="openEditNameModal(${i.item_id}, '${i.name.replace(/'/g, "\\'")}')">Edit Name</button>
+            </td>
         </tr>
     `).join('');
 }
@@ -130,6 +151,41 @@ async function saveBatch(batchId) {
 function closeBatchModal() {
     document.getElementById('batchModal').style.display = 'none';
     batchModalItemId = null;
+}
+
+function openEditNameModal(itemId, currentName) {
+    editNameTargetId = itemId;
+    document.getElementById('editNameInput').value = currentName;
+    document.getElementById('editNameModal').style.display = 'block';
+}
+
+function closeEditNameModal() {
+    document.getElementById('editNameModal').style.display = 'none';
+    editNameTargetId = null;
+}
+
+async function submitEditName() {
+    const name = document.getElementById('editNameInput').value.trim();
+    if (!name) return toast('Item name is required');
+    const item = items.find(i => i.item_id === editNameTargetId);
+    try {
+        // Carry forward the item's existing sku/category/unit unchanged - this
+        // window only ever touches the name.
+        await api(`/items/${editNameTargetId}`, {
+            method: 'PUT',
+            body: JSON.stringify({
+                name,
+                sku: item.sku,
+                category_id: item.category_id,
+                unit_id: item.unit_id,
+            }),
+        });
+        toast('Item name updated');
+        closeEditNameModal();
+        loadItems();
+    } catch (err) {
+        toast(err.message);
+    }
 }
 
 loadItems();
