@@ -161,9 +161,9 @@ router.post('/', async (req, res) => {
         const status = amountPaid >= total && total > 0 ? 'paid' : (amountPaid > 0 ? 'partial' : 'unpaid');
 
         const saleResult = await client.query(
-            `INSERT INTO sales (invoice_no, customer_name, amount_paid, total, status)
-             VALUES ($1, $2, $3, $4, $5) RETURNING *`,
-            [invoice_no, (customer_name && customer_name.trim()) || 'Walk-in Customer', amountPaid, total, status]
+            `INSERT INTO sales (invoice_no, customer_name, amount_paid, total, status, created_by)
+             VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
+            [invoice_no, (customer_name && customer_name.trim()) || 'Walk-in Customer', amountPaid, total, status, 'Admin']
         );
         const sale = saleResult.rows[0];
 
