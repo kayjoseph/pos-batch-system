@@ -29,7 +29,7 @@
 
         <table>
             <thead>
-                <tr><th>Invoice No.</th><th>Date</th><th>Customer</th><th>Total</th><th>Amount Paid</th><th>Status</th><th></th></tr>
+                <tr><th>Invoice No.</th><th>Date</th><th>Customer</th><th>Total</th><th>Amount Paid</th><th>Status</th><th>Created By</th><th></th></tr>
             </thead>
             <tbody id="salesBody"></tbody>
         </table>
@@ -77,7 +77,7 @@ function clearFilters() {
 function renderSales(list) {
     const body = document.getElementById('salesBody');
     if (list.length === 0) {
-        body.innerHTML = `<tr><td colspan="7"><div class="empty-state">No sales match these filters.</div></td></tr>`;
+        body.innerHTML = `<tr><td colspan="8"><div class="empty-state">No sales match these filters.</div></td></tr>`;
         return;
     }
     body.innerHTML = list.map(s => `
@@ -88,6 +88,7 @@ function renderSales(list) {
             <td class="mono">${s.total}</td>
             <td class="mono">${s.amount_paid}</td>
             <td><span class="badge ${s.status}">${s.status}</span></td>
+            <td>${s.created_by || '-'}</td>
             <td><button class="secondary" onclick="location.href='sale-view.html?id=${s.sale_id}'">View</button></td>
         </tr>
     `).join('');
