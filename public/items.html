@@ -21,7 +21,7 @@
 
         <table>
             <thead>
-                <tr><th>Item Code</th><th>Name</th><th>Category</th><th>Unit</th><th></th></tr>
+                <tr><th>Item Code</th><th>SKU</th><th>Name</th><th>Category</th><th>Unit</th><th></th></tr>
             </thead>
             <tbody id="itemsBody"></tbody>
         </table>
@@ -36,7 +36,7 @@
             <label>Name *</label><input id="editName" style="flex:1;">
         </div>
         <div class="form-row">
-            <label>SKU *</label><input id="editSku" style="flex:1;">
+            <label>SKU</label><input id="editSku" placeholder="optional" style="flex:1;">
         </div>
         <div class="form-row">
             <label>Category *</label>
@@ -79,7 +79,10 @@ async function loadItems() {
 function applyFilters() {
     const query = document.getElementById('filterQuery').value.trim().toLowerCase();
     const filtered = query
-        ? items.filter(i => (i.sku || '').toLowerCase().includes(query) || i.name.toLowerCase().includes(query))
+        ? items.filter(i =>
+            (i.item_code || '').toLowerCase().includes(query) ||
+            (i.sku || '').toLowerCase().includes(query) ||
+            i.name.toLowerCase().includes(query))
         : items;
     renderItems(filtered);
 }
@@ -92,16 +95,17 @@ function clearFilters() {
 function renderItems(list) {
     const body = document.getElementById('itemsBody');
     if (items.length === 0) {
-        body.innerHTML = `<tr><td colspan="5"><div class="empty-state">No items yet. <a href="items-register.html">Register your first item</a>.</div></td></tr>`;
+        body.innerHTML = `<tr><td colspan="6"><div class="empty-state">No items yet. <a href="items-register.html">Register your first item</a>.</div></td></tr>`;
         return;
     }
     if (list.length === 0) {
-        body.innerHTML = `<tr><td colspan="5"><div class="empty-state">No items match this search.</div></td></tr>`;
+        body.innerHTML = `<tr><td colspan="6"><div class="empty-state">No items match this search.</div></td></tr>`;
         return;
     }
     body.innerHTML = list.map(i => `
         <tr>
-            <td class="mono">${i.sku}</td>
+            <td class="mono">${i.item_code}</td>
+            <td class="mono">${i.sku || '-'}</td>
             <td>${i.name}</td>
             <td>${i.category || '-'}</td>
             <td class="mono">${i.unit_short_name || '-'}</td>
@@ -137,7 +141,7 @@ function openEditModal(id) {
     editTargetId = id;
 
     document.getElementById('editName').value = item.name;
-    document.getElementById('editSku').value = item.sku;
+    document.getElementById('editSku').value = item.sku || '';
 
     document.getElementById('editCategory').innerHTML = categories
         .map(c => `<option value="${c.category_id}" ${c.category_id === item.category_id ? 'selected' : ''}>${c.name}</option>`)
@@ -161,7 +165,6 @@ async function submitEdit() {
     const unit_id = Number(document.getElementById('editUnit').value);
 
     if (!name) return toast('Item name is required');
-    if (!sku) return toast('SKU is required');
     if (!category_id) return toast('Category is required');
     if (!unit_id) return toast('Unit of measure is required');
 
