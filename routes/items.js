@@ -7,7 +7,7 @@ const pool = require('../db/pool');
 router.get('/', async (req, res) => {
     try {
         const result = await pool.query(`
-            SELECT i.item_id, i.name, i.sku, i.category_id, c.name AS category,
+            SELECT i.item_id, i.item_code, i.name, i.sku, i.category_id, c.name AS category,
                    i.unit_id, u.name AS unit_name, u.short_name AS unit_short_name,
                    COALESCE(SUM(b.qty_remaining), 0) AS total_stock,
                    (SELECT b2.selling_price FROM batches b2
@@ -45,19 +45,26 @@ router.get('/:id', async (req, res) => {
     }
 });
 
-// CREATE item - name, sku, category, and unit are all required at registration.
+// CREATE item - name, category, and unit are required. SKU is optional.
+// item_code is never taken from the request - it's always assigned from the
+// new row's own id right after insert, so it's guaranteed to match item_id.
 router.post('/', async (req, res) => {
     const { name, sku, category_id, unit_id } = req.body;
     if (!name || !name.trim()) return res.status(400).json({ error: 'Item name is required' });
-    if (!sku || !sku.trim()) return res.status(400).json({ error: 'SKU is required' });
     if (!category_id) return res.status(400).json({ error: 'Category is required' });
     if (!unit_id) return res.status(400).json({ error: 'Unit of measure is required' });
     try {
-        const result = await pool.query(
+        const insertResult = await pool.query(
             'INSERT INTO items (name, sku, category_id, unit_id) VALUES ($1, $2, $3, $4) RETURNING *',
-            [name.trim(), sku.trim(), category_id, unit_id]
+            [name.trim(), (sku && sku.trim()) || null, category_id, unit_id]
         );
-        res.status(201).json(result.rows[0]);
+        const item = insertResult.rows[0];
+        const itemCode = String(item.item_id).padStart(4, '0');
+        const updateResult = await pool.query(
+            'UPDATE items SET item_code = $1 WHERE item_id = $2 RETURNING *',
+            [itemCode, item.item_id]
+        );
+        res.status(201).json(updateResult.rows[0]);
     } catch (err) {
         console.error(err);
         if (err.code === '23505') {
@@ -67,17 +74,18 @@ router.post('/', async (req, res) => {
     }
 });
 
-// UPDATE item - same required fields as registration
+// UPDATE item - name/category/unit required, SKU optional. item_code is
+// immutable - it's left out of this query entirely so it can never drift
+// from item_id once assigned.
 router.put('/:id', async (req, res) => {
     const { name, sku, category_id, unit_id } = req.body;
     if (!name || !name.trim()) return res.status(400).json({ error: 'Item name is required' });
-    if (!sku || !sku.trim()) return res.status(400).json({ error: 'SKU is required' });
     if (!category_id) return res.status(400).json({ error: 'Category is required' });
     if (!unit_id) return res.status(400).json({ error: 'Unit of measure is required' });
     try {
         const result = await pool.query(
             'UPDATE items SET name = $1, sku = $2, category_id = $3, unit_id = $4 WHERE item_id = $5 RETURNING *',
-            [name.trim(), sku.trim(), category_id, unit_id, req.params.id]
+            [name.trim(), (sku && sku.trim()) || null, category_id, unit_id, req.params.id]
         );
         if (result.rows.length === 0) return res.status(404).json({ error: 'Item not found' });
         res.json(result.rows[0]);
