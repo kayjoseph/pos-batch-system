@@ -113,9 +113,9 @@ router.post('/', async (req, res) => {
         const purchaseInvoiceNo = await generateNextPurchaseInvoiceNo(client);
 
         const purchaseResult = await client.query(
-            `INSERT INTO purchases (purchase_invoice_no, supplier, status, subtotal, total, amount_paid, payment_method, payment_status)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
-            [purchaseInvoiceNo, (supplier && supplier.trim()) || 'General Supplier', status, subtotal, total, amount_paid, payment_method, paymentStatus]
+            `INSERT INTO purchases (purchase_invoice_no, supplier, status, subtotal, total, amount_paid, payment_method, payment_status, created_by)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
+            [purchaseInvoiceNo, (supplier && supplier.trim()) || 'General Supplier', status, subtotal, total, amount_paid, payment_method, paymentStatus, 'Admin']
         );
         const purchase = purchaseResult.rows[0];
 
