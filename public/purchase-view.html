@@ -24,6 +24,7 @@
                 <div class="doc-meta-block">
                     <dt>Supplier</dt><dd id="metaSupplier">-</dd>
                     <dt>Purchase Invoice No.</dt><dd id="metaInvoice">-</dd>
+                    <dt>Created By</dt><dd id="metaCreatedBy">-</dd>
                 </div>
                 <div class="doc-meta-block">
                     <dt>Payment Method</dt><dd id="metaMethod">-</dd>
@@ -67,6 +68,7 @@ async function load() {
         document.getElementById('statusBadge').className = `badge ${purchase.status}`;
         document.getElementById('metaSupplier').textContent = purchase.supplier || '-';
         document.getElementById('metaInvoice').textContent = invoiceLabel;
+        document.getElementById('metaCreatedBy').textContent = purchase.created_by || '-';
         document.getElementById('metaMethod').textContent = purchase.payment_method || '-';
         document.getElementById('metaPaidBalance').textContent =
             `Ksh ${purchase.amount_paid} / Ksh ${purchase.balance}`;
