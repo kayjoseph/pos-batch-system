@@ -344,6 +344,8 @@ input.invalid-input { border-color: var(--danger); }
 .action-menu-item:hover { background: var(--accent-soft); }
 .action-menu-item.danger { color: var(--danger); }
 .action-menu-item.danger:hover { background: var(--danger-soft); }
+.action-menu-item.disabled { color: var(--text-muted); }
+.action-menu-item.disabled:hover { background: var(--canvas); }
 
 
 
