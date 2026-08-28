@@ -31,7 +31,7 @@
             <thead>
                 <tr>
                     <th>Invoice No.</th><th>Date</th><th>Supplier</th><th>Status</th><th>Total</th>
-                    <th>Paid</th><th>Balance</th><th>Payment</th><th></th>
+                    <th>Paid</th><th>Balance</th><th>Payment</th><th>Created By</th><th></th>
                 </tr>
             </thead>
             <tbody id="purchasesBody"></tbody>
@@ -102,7 +102,7 @@ function clearFilters() {
 function renderPurchases(list) {
     const body = document.getElementById('purchasesBody');
     if (list.length === 0) {
-        body.innerHTML = `<tr><td colspan="9"><div class="empty-state">No purchases match these filters.</div></td></tr>`;
+        body.innerHTML = `<tr><td colspan="10"><div class="empty-state">No purchases match these filters.</div></td></tr>`;
         return;
     }
     body.innerHTML = list.map(p => `
@@ -115,6 +115,7 @@ function renderPurchases(list) {
             <td class="mono">${p.amount_paid}</td>
             <td class="mono">${p.balance}</td>
             <td><span class="badge ${p.payment_status}">${p.payment_status}</span></td>
+            <td>${p.created_by || '-'}</td>
             <td>
                 <button class="secondary" onclick="location.href='purchase-view.html?id=${p.purchase_id}'">View</button>
                 ${p.status === 'lpo' ? `<button onclick="receiveStock(${p.purchase_id})">Receive Stock</button>` : ''}
