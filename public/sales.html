@@ -29,7 +29,10 @@
 
         <table>
             <thead>
-                <tr><th>Invoice No.</th><th>Date</th><th>Customer</th><th>Total</th><th>Amount Paid</th><th>Status</th><th>Created By</th><th></th></tr>
+                <tr>
+                    <th>Invoice No.</th><th>Date</th><th>Customer</th><th>Total</th>
+                    <th>Amount Paid</th><th>Balance</th><th>Status</th><th>Created By</th><th></th>
+                </tr>
             </thead>
             <tbody id="salesBody"></tbody>
         </table>
@@ -77,21 +80,57 @@ function clearFilters() {
 function renderSales(list) {
     const body = document.getElementById('salesBody');
     if (list.length === 0) {
-        body.innerHTML = `<tr><td colspan="8"><div class="empty-state">No sales match these filters.</div></td></tr>`;
+        body.innerHTML = `<tr><td colspan="9"><div class="empty-state">No sales match these filters.</div></td></tr>`;
         return;
     }
-    body.innerHTML = list.map(s => `
+    body.innerHTML = list.map(s => {
+        const dateObj = new Date(s.sale_date);
+        const balance = (Number(s.total) - Number(s.amount_paid)).toFixed(2);
+        return `
         <tr>
             <td class="mono">${s.invoice_no}</td>
-            <td class="mono">${new Date(s.sale_date).toLocaleString()}</td>
+            <td class="mono">
+                ${dateObj.toLocaleDateString()}<br>
+                <span style="color:var(--text-muted); font-size:11.5px;">${dateObj.toLocaleTimeString()}</span>
+            </td>
             <td>${s.customer_name || 'Walk-in Customer'}</td>
             <td class="mono">${s.total}</td>
             <td class="mono">${s.amount_paid}</td>
+            <td class="mono">${balance}</td>
             <td><span class="badge ${s.status}">${s.status}</span></td>
             <td>${s.created_by || '-'}</td>
-            <td><button class="secondary" onclick="location.href='sale-view.html?id=${s.sale_id}'">View</button></td>
+            <td>
+                <div class="action-menu-wrap">
+                    <button class="secondary" onclick="toggleActionMenu(${s.sale_id})">Action &#9662;</button>
+                    <div class="action-menu" id="action-menu-${s.sale_id}">
+                        <div class="action-menu-item" onclick="location.href='sale-view.html?id=${s.sale_id}'">View</div>
+                        <div class="action-menu-item disabled" onclick="comingSoon()">Print POS Invoice</div>
+                        <div class="action-menu-item disabled" onclick="comingSoon()">Cancel Sale</div>
+                        <div class="action-menu-item disabled" onclick="comingSoon()">Sale Return</div>
+                    </div>
+                </div>
+            </td>
         </tr>
-    `).join('');
+    `;
+    }).join('');
+}
+
+function toggleActionMenu(id) {
+    const menu = document.getElementById(`action-menu-${id}`);
+    const isOpen = menu.classList.contains('open');
+    document.querySelectorAll('.action-menu.open').forEach(m => m.classList.remove('open'));
+    if (!isOpen) menu.classList.add('open');
+}
+
+document.addEventListener('click', (e) => {
+    if (!e.target.closest('.action-menu-wrap')) {
+        document.querySelectorAll('.action-menu.open').forEach(m => m.classList.remove('open'));
+    }
+});
+
+function comingSoon() {
+    document.querySelectorAll('.action-menu.open').forEach(m => m.classList.remove('open'));
+    toast('Coming soon');
 }
 
 loadSales();
