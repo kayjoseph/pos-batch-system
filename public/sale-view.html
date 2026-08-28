@@ -24,6 +24,7 @@
                 <div class="doc-meta-block">
                     <dt>Customer</dt><dd id="metaCustomer">-</dd>
                     <dt>Invoice No.</dt><dd id="metaInvoice">-</dd>
+                    <dt>Created By</dt><dd id="metaCreatedBy">-</dd>
                 </div>
                 <div class="doc-meta-block">
                     <dt>Payment Methods</dt><dd id="metaPayments">-</dd>
@@ -65,6 +66,7 @@ async function load() {
         document.getElementById('statusBadge').className = `badge ${sale.status}`;
         document.getElementById('metaCustomer').textContent = sale.customer_name || 'Walk-in Customer';
         document.getElementById('metaInvoice').textContent = sale.invoice_no;
+        document.getElementById('metaCreatedBy').textContent = sale.created_by || '-';
         document.getElementById('metaPayments').textContent = sale.payments.length
             ? sale.payments.map(p => `${p.method}: Ksh ${p.amount}`).join(', ')
             : 'None recorded';
