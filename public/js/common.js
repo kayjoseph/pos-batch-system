@@ -33,13 +33,16 @@ function expiryClass(dateStr) {
 /* ============ Sidebar ============ */
 // activePage one of:
 // 'items-register', 'items-list', 'categories', 'units', 'stock-manager', 'purchase-add', 'purchase-list',
-// 'pos-terminal', 'invoice', 'sales'
+// 'suppliers', 'pos-terminal', 'invoice', 'sales', 'customers'
 function renderSidebar(activePage) {
     const icons = {
         items: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8L12 3 3 8l9 5 9-5z"/><path d="M3 8v8l9 5 9-5V8"/><path d="M12 13v8"/></svg>',
         purchase: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2l1.5 5h9L18 2"/><path d="M3.5 7h17l-1.6 11.2a2 2 0 0 1-2 1.8H7.1a2 2 0 0 1-2-1.8L3.5 7z"/><path d="M10 11v4M14 11v4"/></svg>',
         pos: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M3 12h18"/><path d="M8 16h.01M12 16h.01"/></svg>',
         sales: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2h12v19l-3-2-3 2-3-2-3 2V2z"/><path d="M8.5 8h7M8.5 12h7"/></svg>',
+        customers: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.5"/><path d="M5 20c0-3.5 3-6 7-6s7 2.5 7 6"/></svg>',
+        suppliers: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="9" width="13" height="9" rx="1"/><path d="M15 12h4l3 3v3h-7z"/><circle cx="6.5" cy="18.5" r="1.5"/><circle cx="17.5" cy="18.5" r="1.5"/></svg>',
+        expenses: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17 9V7a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-2"/><path d="M13 12h8l-2.5-2.5M21 12l-2.5 2.5"/></svg>',
         chevron: '<svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>',
     };
 
@@ -75,6 +78,18 @@ function renderSidebar(activePage) {
         </div>
 
         <div class="nav-item">
+            <a class="nav-link ${activePage === 'suppliers' ? 'active' : ''}" href="suppliers.html">
+                ${icons.suppliers}<span>Suppliers</span>
+            </a>
+        </div>
+
+        <div class="nav-item">
+            <a class="nav-link ${activePage === 'expenses' ? 'active' : ''}" href="expenses.html">
+                ${icons.expenses}<span>Expenses</span>
+            </a>
+        </div>
+
+        <div class="nav-item">
             <div class="nav-link" id="posToggle">
                 ${icons.pos}<span>POS</span>${icons.chevron}
             </div>
@@ -87,6 +102,12 @@ function renderSidebar(activePage) {
         <div class="nav-item">
             <a class="nav-link ${activePage === 'sales' ? 'active' : ''}" href="sales.html">
                 ${icons.sales}<span>Sales</span>
+            </a>
+        </div>
+
+        <div class="nav-item">
+            <a class="nav-link ${activePage === 'customers' ? 'active' : ''}" href="customers.html">
+                ${icons.customers}<span>Customers</span>
             </a>
         </div>
     </nav>`;
