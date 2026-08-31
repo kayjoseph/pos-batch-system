@@ -32,10 +32,11 @@ function expiryClass(dateStr) {
 
 /* ============ Sidebar ============ */
 // activePage one of:
-// 'items-register', 'items-list', 'categories', 'units', 'stock-manager', 'purchase-add', 'purchase-list',
+// 'dashboard', 'items-register', 'items-list', 'categories', 'units', 'stock-manager', 'purchase-add', 'purchase-list',
 // 'suppliers', 'pos-terminal', 'invoice', 'sales', 'customers'
 function renderSidebar(activePage) {
     const icons = {
+        dashboard: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="8" height="8" rx="1"/><rect x="13" y="3" width="8" height="5" rx="1"/><rect x="13" y="10" width="8" height="11" rx="1"/><rect x="3" y="13" width="8" height="8" rx="1"/></svg>',
         items: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8L12 3 3 8l9 5 9-5z"/><path d="M3 8v8l9 5 9-5V8"/><path d="M12 13v8"/></svg>',
         purchase: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2l1.5 5h9L18 2"/><path d="M3.5 7h17l-1.6 11.2a2 2 0 0 1-2 1.8H7.1a2 2 0 0 1-2-1.8L3.5 7z"/><path d="M10 11v4M14 11v4"/></svg>',
         pos: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M3 12h18"/><path d="M8 16h.01M12 16h.01"/></svg>',
@@ -53,6 +54,12 @@ function renderSidebar(activePage) {
     const html = `
     <nav class="sidebar">
         <div class="sidebar-brand"><span class="tag-dot"></span> POS Batch System</div>
+
+        <div class="nav-item">
+            <a class="nav-link ${activePage === 'dashboard' ? 'active' : ''}" href="dashboard.html">
+                ${icons.dashboard}<span>Dashboard</span>
+            </a>
+        </div>
 
         <div class="nav-item">
             <div class="nav-link" id="itemsToggle">
