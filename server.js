@@ -12,6 +12,7 @@ const unitsRouter = require('./routes/units');
 const customersRouter = require('./routes/customers');
 const suppliersRouter = require('./routes/suppliers');
 const expensesRouter = require('./routes/expenses');
+const dashboardRouter = require('./routes/dashboard');
 
 const app = express();
 
@@ -28,6 +29,7 @@ app.use('/api/units', unitsRouter);
 app.use('/api/customers', customersRouter);
 app.use('/api/suppliers', suppliersRouter);
 app.use('/api/expenses', expensesRouter);
+app.use('/api/dashboard', dashboardRouter);
 
 app.get('/health', (req, res) => res.json({ status: 'ok' }));
 
