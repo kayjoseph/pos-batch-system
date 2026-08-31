@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Expenses - POS Batch System</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="app">
+    <div id="sidebarMount"></div>
+    <main class="content">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+            <h1 style="margin:0;">Expenses</h1>
+            <button onclick="openAddModal()">+ Record Expense</button>
+        </div>
+
+        <div class="list-filter-bar">
+            <div class="field">
+                <label>Search</label>
+                <input id="filterQuery" placeholder="Search by category, description, or code..." oninput="applyFilters()">
+            </div>
+            <div class="field">
+                <label>From</label>
+                <input type="date" id="filterFrom" oninput="applyFilters()">
+            </div>
+            <div class="field">
+                <label>To</label>
+                <input type="date" id="filterTo" oninput="applyFilters()">
+            </div>
+            <button class="secondary" onclick="clearFilters()">Clear</button>
+        </div>
+
+        <table>
+            <thead>
+                <tr><th>Code</th><th>Date</th><th>Category</th><th>Description</th><th>Amount</th><th>Method</th><th>Paid To</th><th></th></tr>
+            </thead>
+            <tbody id="expensesBody"></tbody>
+        </table>
+
+        <div style="text-align:right; margin-top:10px; font-size:15px; font-weight:700;">
+            Total: <span class="mono" id="totalAmount">0.00</span>
+        </div>
+    </main>
+</div>
+
+<!-- Add/Edit Expense modal -->
+<div id="expenseModal" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(15,20,28,0.5);">
+    <div class="card" style="max-width:420px; margin:70px auto;">
+        <h2 class="section-title" id="expenseModalTitle">Record Expense</h2>
+        <div class="form-row">
+            <label>Date</label><input type="date" id="expDate" style="flex:1;">
+        </div>
+        <div class="form-row">
+            <label>Category *</label>
+            <select id="expCategory" style="flex:1;">
+                <option value="Rent">Rent</option>
+                <option value="Utilities">Utilities</option>
+                <option value="Salaries">Salaries</option>
+                <option value="Transport">Transport</option>
+                <option value="Supplies">Supplies</option>
+                <option value="Other">Other</option>
+            </select>
+        </div>
+        <div class="form-row">
+            <label>Description</label><input id="expDescription" placeholder="optional" style="flex:1;">
+        </div>
+        <div class="form-row">
+            <label>Amount *</label><input type="number" step="0.01" id="expAmount" style="width:140px;">
+        </div>
+        <div class="form-row">
+            <label>Payment Method</label>
+            <select id="expMethod">
+                <option value="">-- none --</option>
+                <option value="cash">Cash</option>
+                <option value="mpesa">M-Pesa</option>
+                <option value="bank">Bank</option>
+            </select>
+        </div>
+        <div class="form-row">
+            <label>Paid To</label><input id="expPaidTo" placeholder="optional - vendor/landlord/staff" style="flex:1;">
+        </div>
+        <button onclick="saveExpense()">Save</button>
+        <button class="secondary" onclick="closeExpenseModal()">Cancel</button>
+    </div>
+</div>
+
+<!-- Delete confirm modal -->
+<div id="deleteModal" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(15,20,28,0.5);">
+    <div class="card" style="max-width:360px; margin:120px auto; text-align:center;">
+        <p style="font-size:14px; margin-bottom:18px;">Are you sure you want to delete Record</p>
+        <button class="danger" onclick="confirmDelete()">Yes</button>
+        <button class="secondary" onclick="closeDeleteModal()">Cancel</button>
+    </div>
+</div>
+
+<div id="toast"></div>
+<script src="js/common.js"></script>
+<script>
+renderSidebar('expenses');
+
+let expenses = [];
+let editTargetId = null;
+let deleteTargetId = null;
+
+async function loadExpenses() {
+    expenses = await api('/expenses');
+    applyFilters();
+}
+
+function applyFilters() {
+    const query = document.getElementById('filterQuery').value.trim().toLowerCase();
+    const from = document.getElementById('filterFrom').value;
+    const to = document.getElementById('filterTo').value;
+
+    const filtered = expenses.filter(e => {
+        if (query) {
+            const matches = (e.expense_code || '').toLowerCase().includes(query) ||
+                e.category.toLowerCase().includes(query) ||
+                (e.description || '').toLowerCase().includes(query);
+            if (!matches) return false;
+        }
+        const date = e.expense_date.substring(0, 10);
+        if (from && date < from) return false;
+        if (to && date > to) return false;
+        return true;
+    });
+
+    renderExpenses(filtered);
+}
+
+function clearFilters() {
+    document.getElementById('filterQuery').value = '';
+    document.getElementById('filterFrom').value = '';
+    document.getElementById('filterTo').value = '';
+    applyFilters();
+}
+
+function renderExpenses(list) {
+    const body = document.getElementById('expensesBody');
+    if (list.length === 0) {
+        body.innerHTML = `<tr><td colspan="8"><div class="empty-state">No expenses recorded yet.</div></td></tr>`;
+        document.getElementById('totalAmount').textContent = '0.00';
+        return;
+    }
+    body.innerHTML = list.map(e => `
+        <tr>
+            <td class="mono">${e.expense_code}</td>
+            <td class="mono">${e.expense_date.substring(0,10)}</td>
+            <td>${e.category}</td>
+            <td>${e.description || '-'}</td>
+            <td class="mono">${e.amount}</td>
+            <td class="mono">${e.payment_method || '-'}</td>
+            <td>${e.paid_to || '-'}</td>
+            <td>
+                <div class="action-menu-wrap">
+                    <button class="secondary" onclick="toggleActionMenu(${e.expense_id})">Action &#9662;</button>
+                    <div class="action-menu" id="action-menu-${e.expense_id}">
+                        <div class="action-menu-item" onclick="openEditModal(${e.expense_id})">Edit</div>
+                        <div class="action-menu-item danger" onclick="openDeleteModal(${e.expense_id})">Delete</div>
+                    </div>
+                </div>
+            </td>
+        </tr>
+    `).join('');
+
+    const total = list.reduce((sum, e) => sum + Number(e.amount), 0);
+    document.getElementById('totalAmount').textContent = total.toFixed(2);
+}
+
+function toggleActionMenu(id) {
+    const menu = document.getElementById(`action-menu-${id}`);
+    const isOpen = menu.classList.contains('open');
+    document.querySelectorAll('.action-menu.open').forEach(m => m.classList.remove('open'));
+    if (!isOpen) menu.classList.add('open');
+}
+
+function closeAllActionMenus() {
+    document.querySelectorAll('.action-menu.open').forEach(m => m.classList.remove('open'));
+}
+
+document.addEventListener('click', (e) => {
+    if (!e.target.closest('.action-menu-wrap')) closeAllActionMenus();
+});
+
+// ============ Add / Edit (shared modal) ============
+function openAddModal() {
+    editTargetId = null;
+    document.getElementById('expenseModalTitle').textContent = 'Record Expense';
+    document.getElementById('expDate').value = new Date().toISOString().substring(0, 10);
+    document.getElementById('expCategory').value = 'Rent';
+    document.getElementById('expDescription').value = '';
+    document.getElementById('expAmount').value = '';
+    document.getElementById('expMethod').value = '';
+    document.getElementById('expPaidTo').value = '';
+    document.getElementById('expenseModal').style.display = 'block';
+}
+
+function openEditModal(id) {
+    closeAllActionMenus();
+    const e = expenses.find(x => x.expense_id === id);
+    editTargetId = id;
+    document.getElementById('expenseModalTitle').textContent = `Edit Expense - ${e.expense_code}`;
+    document.getElementById('expDate').value = e.expense_date.substring(0, 10);
+    document.getElementById('expCategory').value = e.category;
+    document.getElementById('expDescription').value = e.description || '';
+    document.getElementById('expAmount').value = e.amount;
+    document.getElementById('expMethod').value = e.payment_method || '';
+    document.getElementById('expPaidTo').value = e.paid_to || '';
+    document.getElementById('expenseModal').style.display = 'block';
+}
+
+function closeExpenseModal() {
+    document.getElementById('expenseModal').style.display = 'none';
+    editTargetId = null;
+}
+
+async function saveExpense() {
+    const payload = {
+        expense_date: document.getElementById('expDate').value,
+        category: document.getElementById('expCategory').value,
+        description: document.getElementById('expDescription').value.trim(),
+        amount: Number(document.getElementById('expAmount').value),
+        payment_method: document.getElementById('expMethod').value || null,
+        paid_to: document.getElementById('expPaidTo').value.trim(),
+    };
+    if (!payload.amount || payload.amount <= 0) return toast('Enter a valid amount');
+
+    try {
+        if (editTargetId) {
+            await api(`/expenses/${editTargetId}`, { method: 'PUT', body: JSON.stringify(payload) });
+            toast('Expense updated');
+        } else {
+            await api('/expenses', { method: 'POST', body: JSON.stringify(payload) });
+            toast('Expense recorded');
+        }
+        closeExpenseModal();
+        loadExpenses();
+    } catch (err) {
+        toast(err.message);
+    }
+}
+
+// ============ Delete ============
+function openDeleteModal(id) {
+    closeAllActionMenus();
+    deleteTargetId = id;
+    document.getElementById('deleteModal').style.display = 'block';
+}
+function closeDeleteModal() {
+    document.getElementById('deleteModal').style.display = 'none';
+    deleteTargetId = null;
+}
+async function confirmDelete() {
+    try {
+        const result = await api(`/expenses/${deleteTargetId}`, { method: 'DELETE' });
+        toast(result.message || 'Expense deleted successfully!');
+        closeDeleteModal();
+        loadExpenses();
+    } catch (err) {
+        closeDeleteModal();
+        toast(err.message);
+    }
+}
+
+loadExpenses();
+</script>
+</body>
+</html>
