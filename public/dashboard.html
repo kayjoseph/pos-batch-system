@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Dashboard - POS Batch System</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="app">
+    <div id="sidebarMount"></div>
+    <main class="content" style="max-width:1200px;">
+        <h1>Dashboard</h1>
+
+        <div class="kpi-grid">
+            <div class="kpi-card" style="--kpi-color:#f2a93b;">
+                <div class="kpi-label">Sales Today</div>
+                <div class="kpi-value" id="kpiSalesToday">-</div>
+                <div class="kpi-sub" id="kpiSalesTodayCount"></div>
+            </div>
+            <div class="kpi-card" style="--kpi-color:#c98620;">
+                <div class="kpi-label">Sales This Month</div>
+                <div class="kpi-value" id="kpiSalesMonth">-</div>
+                <div class="kpi-sub" id="kpiSalesWeek"></div>
+            </div>
+            <div class="kpi-card" style="--kpi-color:#2f9e44;">
+                <div class="kpi-label">Gross Profit (Month)</div>
+                <div class="kpi-value" id="kpiProfit">-</div>
+                <div class="kpi-sub">Selling price minus cost, this month's sales</div>
+            </div>
+            <div class="kpi-card" style="--kpi-color:#e03131;">
+                <div class="kpi-label">Expenses This Month</div>
+                <div class="kpi-value" id="kpiExpenses">-</div>
+            </div>
+            <div class="kpi-card" style="--kpi-color:#1b2430;">
+                <div class="kpi-label">Stock Value (Cost)</div>
+                <div class="kpi-value" id="kpiStockValue">-</div>
+                <div class="kpi-sub" id="kpiTotalItems"></div>
+            </div>
+            <div class="kpi-card" style="--kpi-color:#6b7280;">
+                <div class="kpi-label">Out of Stock Items</div>
+                <div class="kpi-value" id="kpiOutOfStock">-</div>
+            </div>
+        </div>
+
+        <div class="strip-grid">
+            <div class="strip-card">
+                <span class="label">Pending LPOs</span>
+                <span class="value" id="stripLpo">-</span>
+            </div>
+            <div class="strip-card">
+                <span class="label">Customers Owe Us</span>
+                <span class="value" id="stripCustomersOwe">-</span>
+            </div>
+            <div class="strip-card">
+                <span class="label">We Owe Suppliers</span>
+                <span class="value" id="stripWeOwe">-</span>
+            </div>
+        </div>
+
+        <div class="dash-grid">
+            <div>
+                <div class="card">
+                    <h2 class="section-title">Sales - Last 7 Days</h2>
+                    <div class="chart-bars" id="salesTrendChart"></div>
+                </div>
+
+                <div class="card">
+                    <h2 class="section-title">Recent Sales</h2>
+                    <table>
+                        <thead><tr><th>Invoice</th><th>Customer</th><th>Total</th><th>Status</th></tr></thead>
+                        <tbody id="recentSalesBody"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div>
+                <div class="card">
+                    <h2 class="section-title">Top Items This Month</h2>
+                    <div id="topItemsList"></div>
+                </div>
+
+                <div class="card">
+                    <h2 class="section-title">Batches Expiring Soon</h2>
+                    <div id="expiringList"></div>
+                </div>
+            </div>
+        </div>
+    </main>
+</div>
+<div id="toast"></div>
+<script src="js/common.js"></script>
+<script>
+renderSidebar('dashboard');
+
+function money(n) {
+    return Number(n).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+async function loadDashboard() {
+    let data;
+    try {
+        data = await api('/dashboard/summary');
+    } catch (err) {
+        toast(err.message);
+        return;
+    }
+
+    document.getElementById('kpiSalesToday').textContent = money(data.sales.sales_today);
+    document.getElementById('kpiSalesTodayCount').textContent = `${data.sales.sales_count_today} sale(s) today`;
+    document.getElementById('kpiSalesMonth').textContent = money(data.sales.sales_month);
+    document.getElementById('kpiSalesWeek').textContent = `${money(data.sales.sales_week)} this week`;
+    document.getElementById('kpiProfit').textContent = money(data.gross_profit_month);
+    document.getElementById('kpiExpenses').textContent = money(data.expenses.expenses_month);
+    document.getElementById('kpiStockValue').textContent = money(data.stock_value);
+    document.getElementById('kpiTotalItems').textContent = `${data.items.total_items} item(s) registered`;
+    document.getElementById('kpiOutOfStock').textContent = data.items.out_of_stock_items;
+
+    document.getElementById('stripLpo').textContent = data.purchases.pending_lpo_count;
+    document.getElementById('stripCustomersOwe').textContent = money(data.customers_owe_us);
+    document.getElementById('stripWeOwe').textContent = money(data.we_owe_suppliers);
+
+    renderTrendChart(data.sales_trend);
+    renderTopItems(data.top_items);
+    renderRecentSales(data.recent_sales);
+    renderExpiring(data.expiring_batches);
+}
+
+function renderTrendChart(trend) {
+    const max = Math.max(...trend.map(t => Number(t.total)), 1);
+    const container = document.getElementById('salesTrendChart');
+    container.innerHTML = trend.map(t => {
+        const heightPct = Math.max((Number(t.total) / max) * 100, 2);
+        return `
+            <div class="chart-bar-col">
+                <div class="chart-bar-value">${Number(t.total) > 0 ? Math.round(t.total) : ''}</div>
+                <div class="chart-bar" style="height:${heightPct}%"></div>
+                <div class="chart-bar-label">${t.day_label}</div>
+            </div>
+        `;
+    }).join('');
+}
+
+function renderTopItems(items) {
+    const container = document.getElementById('topItemsList');
+    if (items.length === 0) {
+        container.innerHTML = `<div class="empty-state">No sales recorded this month yet.</div>`;
+        return;
+    }
+    const max = Math.max(...items.map(i => Number(i.qty_sold)), 1);
+    container.innerHTML = items.map(i => `
+        <div class="rank-row">
+            <div class="rank-name">${i.name}</div>
+            <div class="rank-bar-track"><div class="rank-bar-fill" style="width:${(i.qty_sold / max) * 100}%"></div></div>
+            <div class="rank-value">${i.qty_sold}</div>
+        </div>
+    `).join('');
+}
+
+function renderRecentSales(sales) {
+    const body = document.getElementById('recentSalesBody');
+    if (sales.length === 0) {
+        body.innerHTML = `<tr><td colspan="4"><div class="empty-state">No sales yet.</div></td></tr>`;
+        return;
+    }
+    body.innerHTML = sales.map(s => `
+        <tr>
+            <td class="mono">${s.invoice_no}</td>
+            <td>${s.customer_name || 'Walk-in Customer'}</td>
+            <td class="mono">${money(s.total)}</td>
+            <td><span class="badge ${s.status}">${s.status}</span></td>
+        </tr>
+    `).join('');
+}
+
+function renderExpiring(batches) {
+    const container = document.getElementById('expiringList');
+    if (batches.length === 0) {
+        container.innerHTML = `<div class="empty-state">Nothing expiring in the next 30 days.</div>`;
+        return;
+    }
+    container.innerHTML = batches.map(b => `
+        <div class="expiry-row">
+            <span>${b.item_name} <span class="mono" style="color:var(--text-muted);">(${b.batch_ref_no})</span></span>
+            <span class="mono ${expiryClass(b.expiry_date)}">${b.expiry_date.substring(0,10)}</span>
+        </div>
+    `).join('');
+}
+
+loadDashboard();
+</script>
+</body>
+</html>
