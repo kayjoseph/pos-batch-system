@@ -90,3 +90,24 @@ CREATE TABLE purchases (
     payment_status      VARCHAR(10) CHECK (payment_status IN ('paid','partial','unpaid')) DEFAULT 'unpaid',
     created_by          VARCHAR(100) DEFAULT 'Admin'
 );
+
+-- ============================================================================
+-- Batches (depends on items, purchases)
+-- ============================================================================
+
+-- One row per batch. Created automatically whenever a purchase line is
+-- received into stock.
+CREATE TABLE batches (
+    batch_id       SERIAL PRIMARY KEY,
+    item_id        INT NOT NULL REFERENCES items(item_id),
+    purchase_id    INT REFERENCES purchases(purchase_id),
+    batch_ref_no   VARCHAR(20) UNIQUE NOT NULL,  -- auto-generated (B-0001...), editable afterward
+    expiry_date    DATE,
+    cost_price     NUMERIC(12,2) DEFAULT 0,
+    selling_price  NUMERIC(12,2) NOT NULL,
+    qty_in         NUMERIC(12,2) NOT NULL,
+    qty_remaining  NUMERIC(12,2) NOT NULL,
+    date_received  TIMESTAMP DEFAULT NOW()
+);
+
+
