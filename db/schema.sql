@@ -110,4 +110,24 @@ CREATE TABLE batches (
     date_received  TIMESTAMP DEFAULT NOW()
 );
 
+-- ============================================================================
+-- Purchase lines (depends on purchases, items, batches)
+-- ============================================================================
+
+-- One row per purchase line, created whether or not stock has been received
+-- yet. A line only gets a batch_id once it's actually received into stock.
+CREATE TABLE purchase_lines (
+    purchase_line_id SERIAL PRIMARY KEY,
+    purchase_id      INT NOT NULL REFERENCES purchases(purchase_id),
+    item_id          INT NOT NULL REFERENCES items(item_id),
+    qty              NUMERIC(12,2) NOT NULL,
+    cost_price       NUMERIC(12,2) DEFAULT 0,
+    selling_price    NUMERIC(12,2) NOT NULL,
+    expiry_date      DATE,
+    batch_ref_no     VARCHAR(20),
+    batch_id         INT REFERENCES batches(batch_id),
+    received         BOOLEAN DEFAULT FALSE
+);
+
+
 
