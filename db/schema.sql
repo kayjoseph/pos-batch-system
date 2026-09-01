@@ -129,5 +129,37 @@ CREATE TABLE purchase_lines (
     received         BOOLEAN DEFAULT FALSE
 );
 
+-- ============================================================================
+-- Sales
+-- ============================================================================
+
+CREATE TABLE sales (
+    sale_id       SERIAL PRIMARY KEY,
+    invoice_no    VARCHAR(30) UNIQUE NOT NULL,   -- e.g. INV-0001
+    customer_name VARCHAR(150) DEFAULT 'Walk-in Customer', -- free text for now, not linked to customers table
+    sale_date     TIMESTAMP DEFAULT NOW(),
+    amount_paid   NUMERIC(12,2) DEFAULT 0,
+    total         NUMERIC(12,2) DEFAULT 0,
+    status        VARCHAR(10) CHECK (status IN ('paid','unpaid','partial')) DEFAULT 'unpaid',
+    created_by    VARCHAR(100) DEFAULT 'Admin'
+);
+
+
+-- ============================================================================
+-- Sale lines and payments (depend on sales, items, batches)
+-- ============================================================================
+
+-- Every sale line records exactly which batch it drew stock from.
+CREATE TABLE sale_items (
+    sale_item_id  SERIAL PRIMARY KEY,
+    sale_id       INT NOT NULL REFERENCES sales(sale_id),
+    item_id       INT NOT NULL REFERENCES items(item_id),
+    batch_id      INT NOT NULL REFERENCES batches(batch_id),
+    qty           NUMERIC(12,2) NOT NULL,
+    unit_price    NUMERIC(12,2) NOT NULL,
+    line_total    NUMERIC(12,2) NOT NULL
+);
+
+
 
 
