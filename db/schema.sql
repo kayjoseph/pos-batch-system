@@ -160,6 +160,35 @@ CREATE TABLE sale_items (
     line_total    NUMERIC(12,2) NOT NULL
 );
 
+-- One row per payment method used on a sale, so a single sale can be split
+-- across cash/mpesa/bank. sales.amount_paid is the running total; this table
+-- is the breakdown behind it.
+CREATE TABLE sale_payments (
+    payment_id SERIAL PRIMARY KEY,
+    sale_id    INT NOT NULL REFERENCES sales(sale_id),
+    method     VARCHAR(10) CHECK (method IN ('cash','mpesa','bank')),
+    amount     NUMERIC(12,2) NOT NULL
+);
+
+
+-- ============================================================================
+-- Expenses (standalone)
+-- ============================================================================
+
+CREATE TABLE expenses (
+    expense_id     SERIAL PRIMARY KEY,
+    expense_code   VARCHAR(20) UNIQUE,   -- e.g. EXP-0001
+    expense_date   DATE NOT NULL DEFAULT CURRENT_DATE,
+    category       VARCHAR(50) NOT NULL,  -- Rent, Utilities, Salaries, Transport, Supplies, Other
+    description    VARCHAR(255),
+    amount         NUMERIC(12,2) NOT NULL,
+    payment_method VARCHAR(10) CHECK (payment_method IN ('cash','mpesa','bank')),
+    paid_to        VARCHAR(150),
+    created_by     VARCHAR(100) DEFAULT 'Admin',
+    created_at     TIMESTAMP DEFAULT NOW()
+);
+
+
 
 
 
