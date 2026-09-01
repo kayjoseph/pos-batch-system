@@ -73,3 +73,20 @@ CREATE TABLE items (
     created_at  TIMESTAMP DEFAULT NOW()
 );
 
+-- ============================================================================
+-- Purchases
+-- ============================================================================
+
+CREATE TABLE purchases (
+    purchase_id         SERIAL PRIMARY KEY,
+    purchase_invoice_no VARCHAR(20) UNIQUE NOT NULL,  -- e.g. PUR-0001
+    supplier            VARCHAR(150) DEFAULT 'General Supplier', -- free text for now, not linked to suppliers table
+    purchase_date       TIMESTAMP DEFAULT NOW(),
+    status              VARCHAR(10) CHECK (status IN ('lpo','received')) DEFAULT 'received',
+    subtotal            NUMERIC(12,2) DEFAULT 0,
+    total               NUMERIC(12,2) DEFAULT 0,
+    amount_paid         NUMERIC(12,2) DEFAULT 0,
+    payment_method      VARCHAR(10) CHECK (payment_method IN ('cash','mpesa','bank')),
+    payment_status      VARCHAR(10) CHECK (payment_status IN ('paid','partial','unpaid')) DEFAULT 'unpaid',
+    created_by          VARCHAR(100) DEFAULT 'Admin'
+);
