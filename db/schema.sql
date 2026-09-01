@@ -209,6 +209,15 @@ CREATE INDEX idx_expenses_date ON expenses (expense_date);
 INSERT INTO units_of_measure (name, short_name) VALUES ('Piece', 'Pc');
 UPDATE units_of_measure SET unit_code = 'UOM-' || LPAD(unit_id::text, 4, '0') WHERE name = 'Piece';
 
+-- Default customer and supplier - protected records that can never be deleted.
+INSERT INTO customers (name, opening_balance, is_default) VALUES ('Walk-in Customer', 0, true);
+UPDATE customers SET customer_code = 'CUS-' || LPAD(customer_id::text, 4, '0') WHERE name = 'Walk-in Customer';
+
+INSERT INTO suppliers (name, opening_balance, is_default) VALUES ('General Supplier', 0, true);
+UPDATE suppliers SET supplier_code = 'SUP-' || LPAD(supplier_id::text, 4, '0') WHERE name = 'General Supplier';
+
+-- No categories are seeded - you'll be prompted to add your first one from
+-- the Categories page, since item registration requires picking one.
 
 
 
