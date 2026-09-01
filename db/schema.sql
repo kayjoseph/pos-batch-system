@@ -188,6 +188,28 @@ CREATE TABLE expenses (
     created_at     TIMESTAMP DEFAULT NOW()
 );
 
+-- ============================================================================
+-- Indexes
+-- ============================================================================
+
+CREATE INDEX idx_purchase_lines_purchase ON purchase_lines (purchase_id);
+CREATE INDEX idx_batches_item_fifo ON batches (item_id, date_received);
+CREATE INDEX idx_sale_items_sale ON sale_items (sale_id);
+CREATE INDEX idx_sale_items_batch ON sale_items (batch_id);
+CREATE INDEX idx_sale_payments_sale ON sale_payments (sale_id);
+CREATE INDEX idx_expenses_date ON expenses (expense_date);
+
+
+-- ============================================================================
+-- Seed data - required for the app to function correctly out of the box
+-- ============================================================================
+
+-- Default unit of measure. Item registration requires a unit, and the
+-- register form pre-selects "Piece" if it exists.
+INSERT INTO units_of_measure (name, short_name) VALUES ('Piece', 'Pc');
+UPDATE units_of_measure SET unit_code = 'UOM-' || LPAD(unit_id::text, 4, '0') WHERE name = 'Piece';
+
+
 
 
 
