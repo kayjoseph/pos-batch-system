@@ -1,58 +1,18 @@
--- POS Batch Tracking System - Schema
--- Run this once against your Postgres database to set up the tables.
-
-CREATE TABLE IF NOT EXISTS items (
-    item_id       SERIAL PRIMARY KEY,
-    name          VARCHAR(150) NOT NULL,
-    sku           VARCHAR(50) UNIQUE,
-    category      VARCHAR(100),
-    created_at    TIMESTAMP DEFAULT NOW()
-);
-
-CREATE TABLE IF NOT EXISTS purchases (
-    purchase_id   SERIAL PRIMARY KEY,
-    supplier      VARCHAR(150),
-    purchase_date TIMESTAMP DEFAULT NOW(),
-    subtotal      NUMERIC(12,2) DEFAULT 0,
-    discount      NUMERIC(12,2) DEFAULT 0,
-    total         NUMERIC(12,2) DEFAULT 0
-);
-
--- One row per batch. Created automatically whenever a purchase line is saved.
-CREATE TABLE IF NOT EXISTS batches (
-    batch_id       SERIAL PRIMARY KEY,
-    item_id        INT NOT NULL REFERENCES items(item_id),
-    purchase_id    INT REFERENCES purchases(purchase_id),
-    batch_ref_no   VARCHAR(20) UNIQUE NOT NULL,
-    expiry_date    DATE,
-    cost_price     NUMERIC(12,2) DEFAULT 0,
-    selling_price  NUMERIC(12,2) NOT NULL,
-    qty_in         NUMERIC(12,2) NOT NULL,
-    qty_remaining  NUMERIC(12,2) NOT NULL,
-    date_received  TIMESTAMP DEFAULT NOW()
-);
-
-CREATE TABLE IF NOT EXISTS sales (
-    sale_id       SERIAL PRIMARY KEY,
-    invoice_no    VARCHAR(30) UNIQUE NOT NULL,
-    sale_date     TIMESTAMP DEFAULT NOW(),
-    amount_paid   NUMERIC(12,2) DEFAULT 0,
-    total         NUMERIC(12,2) DEFAULT 0,
-    status        VARCHAR(10) CHECK (status IN ('paid','unpaid','partial')) DEFAULT 'unpaid'
-);
-
--- Every sale line records exactly which batch it drew stock from.
-CREATE TABLE IF NOT EXISTS sale_items (
-    sale_item_id  SERIAL PRIMARY KEY,
-    sale_id       INT NOT NULL REFERENCES sales(sale_id),
-    item_id       INT NOT NULL REFERENCES items(item_id),
-    batch_id      INT NOT NULL REFERENCES batches(batch_id),
-    qty           NUMERIC(12,2) NOT NULL,
-    unit_price    NUMERIC(12,2) NOT NULL,
-    line_total    NUMERIC(12,2) NOT NULL
-);
-
--- Helpful indexes for FIFO lookups and item batch views
-CREATE INDEX IF NOT EXISTS idx_batches_item_fifo ON batches (item_id, date_received);
-CREATE INDEX IF NOT EXISTS idx_sale_items_sale ON sale_items (sale_id);
-CREATE INDEX IF NOT EXISTS idx_sale_items_batch ON sale_items (batch_id);
+-- ============================================================================
+-- POS Batch Tracking System - FULL INSTALL SCRIPT
+-- ============================================================================
+-- Use this to set up the database FRESH on a new machine (e.g. from a flash
+-- disk install). It creates every table in its final, current form directly -
+-- you do NOT need to run any of the old migration_*.sql files after this.
+--
+-- ONLY run this against a brand-new, empty database. It does not contain any
+-- of your existing shop data - if you're moving an existing installation with
+-- real records, take a pg_dump of that database instead of using this script.
+--
+-- Usage:
+--   1. Create a new empty database (e.g. `createdb pos_batch_system`)
+--   2. Run this file against it:
+--        psql -U your_user -d pos_batch_system -f full_install_schema.sql
+--      (or paste it into pgAdmin's Query Tool and execute)
+--   3. Set PGDATABASE in your .env to match the database name you used
+-- ============================================================================
