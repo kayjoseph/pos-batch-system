@@ -136,4 +136,48 @@ function renderSidebar(activePage) {
             chevron.classList.toggle('open');
         });
     });
+
+    buildTopbar(activePage);
+}
+
+// Wraps the page's existing <main class="content"> in a .main-area and
+// prepends an edge-to-edge navy topbar above it - one shell shared by every
+// page, so the title bar looks and behaves identically everywhere.
+function buildTopbar(activePage) {
+    const content = document.querySelector('.app > .content');
+    if (!content) return;
+
+    // Page title comes straight from <title>, e.g. "Sales - POS Batch System" -> "Sales"
+    const pageTitle = document.title.split(' - ')[0];
+
+    const mainArea = document.createElement('div');
+    mainArea.className = 'main-area';
+    content.parentNode.insertBefore(mainArea, content);
+
+    const topbar = document.createElement('header');
+    topbar.className = 'topbar';
+
+    if (activePage === 'dashboard') {
+        topbar.innerHTML = `
+            <h1>${pageTitle}</h1>
+            <div class="topbar-actions">
+                <a href="pos-terminal.html" class="header-btn header-btn-primary">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M3 12h18"/><path d="M8 16h.01M12 16h.01"/></svg>
+                    <span>POS Terminal</span>
+                </a>
+                <button class="header-btn header-btn-secondary" onclick="handleLogout()">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>
+                    <span>Logout</span>
+                </button>
+            </div>`;
+    } else {
+        topbar.innerHTML = `<h1>${pageTitle}</h1>`;
+    }
+
+    mainArea.appendChild(topbar);
+    mainArea.appendChild(content);
+}
+
+function handleLogout() {
+    toast('Logout coming soon');
 }
