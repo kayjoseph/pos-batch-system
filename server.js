@@ -13,11 +13,12 @@ const customersRouter = require('./routes/customers');
 const suppliersRouter = require('./routes/suppliers');
 const expensesRouter = require('./routes/expenses');
 const dashboardRouter = require('./routes/dashboard');
+const settingsRouter = require('./routes/settings');
 
 const app = express();
 
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '5mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
 
 app.use('/api/items', itemsRouter);
@@ -30,6 +31,7 @@ app.use('/api/customers', customersRouter);
 app.use('/api/suppliers', suppliersRouter);
 app.use('/api/expenses', expensesRouter);
 app.use('/api/dashboard', dashboardRouter);
+app.use('/api/settings', settingsRouter);
 
 app.get('/health', (req, res) => res.json({ status: 'ok' }));
 
