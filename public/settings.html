@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Settings - POS Batch System</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="app">
+    <div id="sidebarMount"></div>
+    <main class="content">
+
+        <div class="card" style="max-width:560px;">
+            <h2 class="section-title">Company Settings</h2>
+            <div class="form-row">
+                <label>Company Name *</label><input id="companyName" style="flex:1;">
+            </div>
+            <div class="form-row">
+                <label>Phone</label><input id="companyPhone" style="flex:1;">
+            </div>
+            <div class="form-row">
+                <label>Email</label><input id="companyEmail" type="email" style="flex:1;">
+            </div>
+            <div class="form-row">
+                <label>Address</label><input id="companyAddress" placeholder="Street / building" style="flex:1;">
+            </div>
+            <div class="form-row">
+                <label>Location</label><input id="companyLocation" placeholder="Town / city" style="flex:1;">
+            </div>
+            <div class="form-row">
+                <label>Reg./Tax PIN</label><input id="companyRegNo" placeholder="optional" style="flex:1;">
+            </div>
+            <button onclick="saveCompany()">Save Company Settings</button>
+        </div>
+
+        <div class="card" style="max-width:560px;">
+            <h2 class="section-title">Printer Settings</h2>
+            <div class="form-row">
+                <label>Paper Size</label>
+                <select id="printerPaperSize">
+                    <option value="58mm">58mm (narrow, common on Bluetooth printers)</option>
+                    <option value="80mm">80mm (standard counter printer)</option>
+                    <option value="other">Other</option>
+                </select>
+            </div>
+            <div class="form-row">
+                <label>Connection</label>
+                <select id="printerConnection">
+                    <option value="usb">USB</option>
+                    <option value="bluetooth">Bluetooth</option>
+                    <option value="network">Network</option>
+                </select>
+            </div>
+            <div class="form-row">
+                <label>Receipt Font Size</label>
+                <input id="printerFontSize" type="number" min="8" max="14" step="1" style="width:80px;">
+                <span style="font-size:12px; color:var(--text-muted);">8-14pt only, to keep receipts readable and correctly formatted</span>
+            </div>
+            <button onclick="savePrinter()">Save Printer Settings</button>
+        </div>
+
+        <div class="card" style="max-width:560px;">
+            <h2 class="section-title">Site Settings</h2>
+            <p style="font-size:12.5px; color:var(--text-muted); margin-top:-6px;">
+                This logo will appear on the login page once accounts/login are set up. It's already shown
+                in the sidebar above, so you can see it take effect right away.
+            </p>
+            <div class="form-row" style="align-items:flex-start;">
+                <label>Logo</label>
+                <div>
+                    <div id="logoPreviewWrap" style="margin-bottom:8px;">
+                        <img id="logoPreview" style="display:none; max-height:60px; border:1px solid var(--border); border-radius:6px; padding:4px; background:#fff;">
+                    </div>
+                    <input type="file" id="logoFile" accept="image/*" onchange="handleLogoFile(event)">
+                </div>
+            </div>
+            <div class="form-row">
+                <label>Logo Size</label>
+                <select id="logoSize">
+                    <option value="small">Small</option>
+                    <option value="medium">Medium</option>
+                    <option value="large">Large</option>
+                </select>
+            </div>
+            <button onclick="saveSite()">Save Site Settings</button>
+        </div>
+
+    </main>
+</div>
+<div id="toast"></div>
+<script src="js/common.js"></script>
+<script>
+renderSidebar('settings');
+
+let pendingLogoData = undefined; // undefined = unchanged, null = removed, string = new logo
+
+async function init() {
+    const [company, printer, site] = await Promise.all([
+        api('/settings/company'),
+        api('/settings/printer'),
+        api('/settings/site'),
+    ]);
+
+    document.getElementById('companyName').value = company.company_name || '';
+    document.getElementById('companyPhone').value = company.phone || '';
+    document.getElementById('companyEmail').value = company.email || '';
+    document.getElementById('companyAddress').value = company.address || '';
+    document.getElementById('companyLocation').value = company.location || '';
+    document.getElementById('companyRegNo').value = company.registration_no || '';
+
+    document.getElementById('printerPaperSize').value = printer.paper_size;
+    document.getElementById('printerConnection').value = printer.connection_type;
+    document.getElementById('printerFontSize').value = printer.receipt_font_size;
+
+    document.getElementById('logoSize').value = site.logo_size;
+    if (site.logo_data) {
+        document.getElementById('logoPreview').src = site.logo_data;
+        document.getElementById('logoPreview').style.display = 'inline-block';
+    }
+}
+
+async function saveCompany() {
+    const company_name = document.getElementById('companyName').value.trim();
+    if (!company_name) return toast('Company name is required');
+    try {
+        await api('/settings/company', {
+            method: 'PUT',
+            body: JSON.stringify({
+                company_name,
+                phone: document.getElementById('companyPhone').value.trim(),
+                email: document.getElementById('companyEmail').value.trim(),
+                address: document.getElementById('companyAddress').value.trim(),
+                location: document.getElementById('companyLocation').value.trim(),
+                registration_no: document.getElementById('companyRegNo').value.trim(),
+            }),
+        });
+        toast('Company settings saved');
+    } catch (err) {
+        toast(err.message);
+    }
+}
+
+async function savePrinter() {
+    const receipt_font_size = Number(document.getElementById('printerFontSize').value);
+    if (!Number.isInteger(receipt_font_size) || receipt_font_size < 8 || receipt_font_size > 14) {
+        return toast('Font size must be a whole number between 8 and 14');
+    }
+    try {
+        await api('/settings/printer', {
+            method: 'PUT',
+            body: JSON.stringify({
+                paper_size: document.getElementById('printerPaperSize').value,
+                connection_type: document.getElementById('printerConnection').value,
+                receipt_font_size,
+            }),
+        });
+        toast('Printer settings saved');
+    } catch (err) {
+        toast(err.message);
+    }
+}
+
+// Downscales whatever image is picked to a small max width before storing it,
+// so a full-resolution photo doesn't end up bloating the database.
+function handleLogoFile(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        const img = new Image();
+        img.onload = () => {
+            const maxWidth = 240;
+            const scale = Math.min(1, maxWidth / img.width);
+            const canvas = document.createElement('canvas');
+            canvas.width = img.width * scale;
+            canvas.height = img.height * scale;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+            pendingLogoData = canvas.toDataURL('image/png');
+
+            document.getElementById('logoPreview').src = pendingLogoData;
+            document.getElementById('logoPreview').style.display = 'inline-block';
+        };
+        img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+}
+
+async function saveSite() {
+    const logo_size = document.getElementById('logoSize').value;
+    try {
+        const payload = { logo_size };
+        if (pendingLogoData !== undefined) payload.logo_data = pendingLogoData;
+        else {
+            // Keep whatever logo is already saved if the user didn't pick a new file
+            const current = await api('/settings/site');
+            payload.logo_data = current.logo_data;
+        }
+        await api('/settings/site', { method: 'PUT', body: JSON.stringify(payload) });
+        toast('Site settings saved');
+        pendingLogoData = undefined;
+    } catch (err) {
+        toast(err.message);
+    }
+}
+
+init();
+</script>
+</body>
+</html>
