@@ -44,6 +44,7 @@ function renderSidebar(activePage) {
         customers: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.5"/><path d="M5 20c0-3.5 3-6 7-6s7 2.5 7 6"/></svg>',
         suppliers: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="9" width="13" height="9" rx="1"/><path d="M15 12h4l3 3v3h-7z"/><circle cx="6.5" cy="18.5" r="1.5"/><circle cx="17.5" cy="18.5" r="1.5"/></svg>',
         expenses: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17 9V7a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-2"/><path d="M13 12h8l-2.5-2.5M21 12l-2.5 2.5"/></svg>',
+        settings: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>',
         chevron: '<svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>',
     };
 
@@ -53,7 +54,7 @@ function renderSidebar(activePage) {
 
     const html = `
     <nav class="sidebar">
-        <div class="sidebar-brand"><span class="tag-dot"></span> POS Batch System</div>
+        <div class="sidebar-brand" id="sidebarBrand"><span class="tag-dot"></span> POS Batch System</div>
 
         <div class="nav-item">
             <a class="nav-link ${activePage === 'dashboard' ? 'active' : ''}" href="dashboard.html">
@@ -117,6 +118,12 @@ function renderSidebar(activePage) {
                 ${icons.customers}<span>Customers</span>
             </a>
         </div>
+
+        <div class="nav-item">
+            <a class="nav-link ${activePage === 'settings' ? 'active' : ''}" href="settings.html">
+                ${icons.settings}<span>Settings</span>
+            </a>
+        </div>
     </nav>`;
 
     document.getElementById('sidebarMount').outerHTML = html;
@@ -138,8 +145,24 @@ function renderSidebar(activePage) {
     });
 
     buildTopbar(activePage);
+    applySidebarLogo();
 }
 
+// Replaces the default amber-diamond brand mark with the uploaded business
+// logo, if one has been saved in Settings -> Site Settings.
+async function applySidebarLogo() {
+    try {
+        const site = await api('/settings/site');
+        if (!site.logo_data) return;
+        const sizeMap = { small: '22px', medium: '30px', large: '40px' };
+        const brand = document.getElementById('sidebarBrand');
+        if (brand) {
+            brand.innerHTML = `<img src="${site.logo_data}" style="height:${sizeMap[site.logo_size] || '30px'}; border-radius:4px;"> POS Batch System`;
+        }
+    } catch (err) {
+        // Non-fatal - just keep the default brand mark if this fails
+    }
+}
 // Wraps the page's existing <main class="content"> in a .main-area and
 // prepends an edge-to-edge navy topbar above it - one shell shared by every
 // page, so the title bar looks and behaves identically everywhere.
