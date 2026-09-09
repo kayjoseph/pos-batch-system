@@ -62,8 +62,7 @@
         <div class="card" style="max-width:560px;">
             <h2 class="section-title">Site Settings</h2>
             <p style="font-size:12.5px; color:var(--text-muted); margin-top:-6px;">
-                This logo will appear on the login page once accounts/login are set up. It's already shown
-                in the sidebar above, so you can see it take effect right away.
+                This logo appears in the sidebar and on the login page.
             </p>
             <div class="form-row" style="align-items:flex-start;">
                 <label>Logo</label>
@@ -85,6 +84,31 @@
             <button onclick="saveSite()">Save Site Settings</button>
         </div>
 
+        <div class="card" style="max-width:560px;">
+            <h2 class="section-title">Login Settings</h2>
+            <p style="font-size:12.5px; color:var(--text-muted); margin-top:-6px;">
+                Choose which login screen is used, and set the credentials. Username and password are both
+                case-insensitive, and there's no minimum length or complexity required.
+            </p>
+            <div class="form-row">
+                <label>Login Mode</label>
+                <select id="loginMode" onchange="toggleUsernameField()">
+                    <option value="username_password">Username + Password</option>
+                    <option value="password_only">Password Only</option>
+                </select>
+            </div>
+            <div class="form-row" id="loginUsernameRow">
+                <label>Username</label><input id="loginUsername" style="flex:1;">
+            </div>
+            <div class="form-row">
+                <label>New Password</label><input id="loginNewPassword" type="password" placeholder="leave blank to keep current" style="flex:1;">
+            </div>
+            <div class="form-row">
+                <label>Confirm Password</label><input id="loginConfirmPassword" type="password" style="flex:1;">
+            </div>
+            <button onclick="saveLogin()">Save Login Settings</button>
+        </div>
+
     </main>
 </div>
 <div id="toast"></div>
@@ -92,13 +116,14 @@
 <script>
 renderSidebar('settings');
 
-let pendingLogoData = undefined; // undefined = unchanged, null = removed, string = new logo
+let pendingLogoData = undefined; // undefined = unchanged, string = new logo
 
 async function init() {
-    const [company, printer, site] = await Promise.all([
+    const [company, printer, site, login] = await Promise.all([
         api('/settings/company'),
         api('/settings/printer'),
         api('/settings/site'),
+        api('/settings/login'),
     ]);
 
     document.getElementById('companyName').value = company.company_name || '';
@@ -117,6 +142,15 @@ async function init() {
         document.getElementById('logoPreview').src = site.logo_data;
         document.getElementById('logoPreview').style.display = 'inline-block';
     }
+
+    document.getElementById('loginMode').value = login.login_mode;
+    document.getElementById('loginUsername').value = login.username || '';
+    toggleUsernameField();
+}
+
+function toggleUsernameField() {
+    const mode = document.getElementById('loginMode').value;
+    document.getElementById('loginUsernameRow').style.display = mode === 'username_password' ? 'flex' : 'none';
 }
 
 async function saveCompany() {
@@ -160,8 +194,6 @@ async function savePrinter() {
     }
 }
 
-// Downscales whatever image is picked to a small max width before storing it,
-// so a full-resolution photo doesn't end up bloating the database.
 function handleLogoFile(event) {
     const file = event.target.files[0];
     if (!file) return;
@@ -193,13 +225,34 @@ async function saveSite() {
         const payload = { logo_size };
         if (pendingLogoData !== undefined) payload.logo_data = pendingLogoData;
         else {
-            // Keep whatever logo is already saved if the user didn't pick a new file
             const current = await api('/settings/site');
             payload.logo_data = current.logo_data;
         }
         await api('/settings/site', { method: 'PUT', body: JSON.stringify(payload) });
         toast('Site settings saved');
         pendingLogoData = undefined;
+    } catch (err) {
+        toast(err.message);
+    }
+}
+
+async function saveLogin() {
+    const login_mode = document.getElementById('loginMode').value;
+    const username = document.getElementById('loginUsername').value.trim();
+    const new_password = document.getElementById('loginNewPassword').value;
+    const confirm_password = document.getElementById('loginConfirmPassword').value;
+
+    if (login_mode === 'username_password' && !username) return toast('Username is required for this mode');
+    if (new_password !== confirm_password) return toast('Passwords do not match');
+
+    try {
+        await api('/settings/login', {
+            method: 'PUT',
+            body: JSON.stringify({ login_mode, username, new_password }),
+        });
+        toast('Login settings saved');
+        document.getElementById('loginNewPassword').value = '';
+        document.getElementById('loginConfirmPassword').value = '';
     } catch (err) {
         toast(err.message);
     }
