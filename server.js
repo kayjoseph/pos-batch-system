@@ -14,6 +14,7 @@ const suppliersRouter = require('./routes/suppliers');
 const expensesRouter = require('./routes/expenses');
 const dashboardRouter = require('./routes/dashboard');
 const settingsRouter = require('./routes/settings');
+const authRouter = require('./routes/auth');
 
 const app = express();
 
@@ -32,6 +33,7 @@ app.use('/api/suppliers', suppliersRouter);
 app.use('/api/expenses', expensesRouter);
 app.use('/api/dashboard', dashboardRouter);
 app.use('/api/settings', settingsRouter);
+app.use('/api/auth', authRouter);
 
 app.get('/health', (req, res) => res.json({ status: 'ok' }));
 
