@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const bcrypt = require('bcryptjs');
 const pool = require('../db/pool');
 
 // ============ Company ============
@@ -99,6 +100,53 @@ router.put('/site', async (req, res) => {
     } catch (err) {
         console.error(err);
         res.status(500).json({ error: 'Failed to update site settings' });
+    }
+});
+
+// ============ Login (mode + credentials) ============
+// Note: password_hash is never sent to the browser - GET only returns the
+// mode and username, never the hash or a decoded password.
+router.get('/login', async (req, res) => {
+    try {
+        const result = await pool.query('SELECT login_mode, username FROM login_settings WHERE id = 1');
+        res.json(result.rows[0]);
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Failed to fetch login settings' });
+    }
+});
+
+router.put('/login', async (req, res) => {
+    const { login_mode, username, new_password } = req.body;
+    const validModes = ['username_password', 'password_only'];
+    if (!validModes.includes(login_mode)) return res.status(400).json({ error: 'Invalid login mode' });
+    if (login_mode === 'username_password' && (!username || !username.trim())) {
+        return res.status(400).json({ error: 'Username is required for username + password mode' });
+    }
+
+    try {
+        if (new_password !== undefined && new_password !== null && new_password !== '') {
+            // No minimum length or complexity requirement, by design - even a
+            // single character is accepted. Case-insensitive: normalized to
+            // lowercase before hashing, matching how login compares it.
+            const hash = await bcrypt.hash(String(new_password).toLowerCase(), 10);
+            const result = await pool.query(
+                `UPDATE login_settings SET login_mode = $1, username = $2, password_hash = $3, updated_at = NOW()
+                 WHERE id = 1 RETURNING login_mode, username`,
+                [login_mode, (username && username.trim().toLowerCase()) || 'admin', hash]
+            );
+            return res.json(result.rows[0]);
+        }
+
+        const result = await pool.query(
+            `UPDATE login_settings SET login_mode = $1, username = $2, updated_at = NOW()
+             WHERE id = 1 RETURNING login_mode, username`,
+            [login_mode, (username && username.trim().toLowerCase()) || 'admin']
+        );
+        res.json(result.rows[0]);
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Failed to update login settings' });
     }
 });
 
