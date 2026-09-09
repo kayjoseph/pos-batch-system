@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Login - POS Batch System</title>
+<link rel="stylesheet" href="css/style.css">
+<style>
+    body {
+        background: var(--sidebar-bg);
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        position: relative;
+        overflow: hidden;
+    }
+    body::before {
+        content: "";
+        position: absolute;
+        width: 480px; height: 480px;
+        background: var(--accent);
+        opacity: 0.06;
+        border-radius: 30% 70% 65% 35% / 40% 45% 55% 60%;
+        top: -120px; right: -120px;
+    }
+    body::after {
+        content: "";
+        position: absolute;
+        width: 360px; height: 360px;
+        background: var(--accent);
+        opacity: 0.05;
+        border-radius: 60% 40% 30% 70% / 55% 30% 70% 45%;
+        bottom: -100px; left: -100px;
+    }
+
+    .login-wrap { width: 100%; max-width: 380px; padding: 20px; position: relative; z-index: 1; }
+    .login-card {
+        background: var(--card);
+        border-radius: 12px;
+        padding: 34px 32px 26px 32px;
+        box-shadow: 0 20px 50px rgba(0,0,0,0.35);
+    }
+    .login-brand { display: flex; flex-direction: column; align-items: center; margin-bottom: 22px; }
+    .login-brand img { max-height: 56px; margin-bottom: 10px; }
+    .login-brand .tag-dot-lg {
+        width: 16px; height: 16px; border-radius: 3px; background: var(--accent);
+        transform: rotate(45deg); margin-bottom: 14px;
+    }
+    .login-brand-name { font-weight: 700; font-size: 15px; color: var(--text); }
+    .login-heading { text-align: center; font-size: 18px; font-weight: 700; margin: 0 0 22px 0; color: var(--text); }
+
+    .login-field { margin-bottom: 16px; }
+    .login-field label { display: block; font-size: 12.5px; color: var(--text-muted); margin-bottom: 6px; }
+    .login-field input {
+        width: 100%; padding: 11px 12px; font-size: 14px;
+        border: 1px solid var(--border); border-radius: 7px;
+    }
+    .login-field input:focus { outline: 2px solid var(--accent); outline-offset: -1px; border-color: var(--accent); }
+
+    .login-error {
+        display: none; background: var(--danger-soft); color: var(--danger);
+        border-radius: 6px; padding: 9px 12px; font-size: 13px; margin-bottom: 16px;
+    }
+
+    .login-btn {
+        width: 100%; padding: 11px; font-size: 14px; font-weight: 700;
+        background: var(--accent); color: #1b2430; border: none; border-radius: 7px; cursor: pointer;
+    }
+    .login-btn:hover { background: var(--accent-dark); color: #fff; }
+    .login-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+
+    .login-footer {
+        text-align: center; margin-top: 22px; font-size: 11.5px; color: rgba(255,255,255,0.55);
+        line-height: 1.7;
+    }
+    .login-footer strong { color: rgba(255,255,255,0.8); }
+</style>
+</head>
+<body>
+<div class="login-wrap">
+    <div class="login-card">
+        <div class="login-brand" id="loginBrand">
+            <div class="tag-dot-lg"></div>
+            <div class="login-brand-name">POS Batch System</div>
+        </div>
+
+        <h1 class="login-heading">Sign In</h1>
+
+        <div class="login-error" id="loginError"></div>
+
+        <form id="loginForm" onsubmit="handleLogin(event)">
+            <div class="login-field" id="usernameField" style="display:none;">
+                <label>Username</label>
+                <input id="username" autocomplete="username" autocapitalize="off">
+            </div>
+            <div class="login-field">
+                <label>Password</label>
+                <input id="password" type="password" autocomplete="current-password">
+            </div>
+            <button class="login-btn" id="loginBtn" type="submit">Sign In</button>
+        </form>
+    </div>
+
+    <div class="login-footer">
+        Tel: 0746050626<br>
+        <strong>Developed by Kay Joseph</strong><br>
+        &copy; 2026 All rights reserved
+    </div>
+</div>
+
+<script>
+async function api(path, options = {}) {
+    const res = await fetch(`/api${path}`, { headers: { 'Content-Type': 'application/json' }, ...options });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Request failed');
+    return data;
+}
+
+let loginMode = 'username_password';
+
+async function init() {
+    try {
+        const mode = await api('/auth/mode');
+        loginMode = mode.login_mode;
+        document.getElementById('usernameField').style.display = loginMode === 'username_password' ? 'block' : 'none';
+    } catch (err) {
+        // If this fails, default to showing username+password so the page is still usable
+    }
+
+    try {
+        const site = await api('/settings/site');
+        if (site.logo_data) {
+            const sizeMap = { small: '40px', medium: '56px', large: '76px' };
+            document.getElementById('loginBrand').innerHTML =
+                `<img src="${site.logo_data}" style="max-height:${sizeMap[site.logo_size] || '56px'}">
+                 <div class="login-brand-name">POS Batch System</div>`;
+        }
+    } catch (err) {
+        // Non-fatal - keep the default brand mark
+    }
+}
+
+async function handleLogin(event) {
+    event.preventDefault();
+    const errorBox = document.getElementById('loginError');
+    const btn = document.getElementById('loginBtn');
+    errorBox.style.display = 'none';
+
+    const password = document.getElementById('password').value;
+    const username = document.getElementById('username').value;
+
+    if (!password) {
+        errorBox.textContent = 'Enter your password';
+        errorBox.style.display = 'block';
+        return;
+    }
+    if (loginMode === 'username_password' && !username.trim()) {
+        errorBox.textContent = 'Enter your username';
+        errorBox.style.display = 'block';
+        return;
+    }
+
+    btn.disabled = true;
+    btn.textContent = 'Signing in...';
+    try {
+        const result = await api('/auth/login', {
+            method: 'POST',
+            body: JSON.stringify({ username, password }),
+        });
+        sessionStorage.setItem('loggedIn', 'true');
+        sessionStorage.setItem('role', result.role || 'admin');
+        window.location.href = 'dashboard.html';
+    } catch (err) {
+        errorBox.textContent = err.message || 'Invalid credentials';
+        errorBox.style.display = 'block';
+        btn.disabled = false;
+        btn.textContent = 'Sign In';
+    }
+}
+
+init();
+</script>
+</body>
+</html>
