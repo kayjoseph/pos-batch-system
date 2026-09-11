@@ -1,3 +1,10 @@
+// ============ Auth guard ============
+// Every page that loads this file is protected: with no active login
+// session, bounce straight to the login page before anything else runs.
+if (sessionStorage.getItem('loggedIn') !== 'true') {
+    window.location.href = 'login.html';
+}
+
 async function api(path, options = {}) {
     const res = await fetch(`/api${path}`, {
         headers: { 'Content-Type': 'application/json' },
