@@ -32,8 +32,9 @@ function expiryClass(dateStr) {
 
 /* ============ Sidebar ============ */
 // activePage one of:
-// 'dashboard', 'items-register', 'items-list', 'categories', 'units', 'stock-manager', 'purchase-add', 'purchase-list',
-// 'suppliers', 'pos-terminal', 'invoice', 'sales', 'customers'
+// 'dashboard', 'items-register', 'items-list', 'categories', 'units', 'stock-manager',
+// 'purchase-add', 'purchase-list', 'suppliers', 'pos-terminal', 'invoice', 'sales',
+// 'customers', 'sales-report', 'purchase-report', 'expense-report', 'stock-report', 'settings'
 function renderSidebar(activePage) {
     const icons = {
         dashboard: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="8" height="8" rx="1"/><rect x="13" y="3" width="8" height="5" rx="1"/><rect x="13" y="10" width="8" height="11" rx="1"/><rect x="3" y="13" width="8" height="8" rx="1"/></svg>',
@@ -44,6 +45,7 @@ function renderSidebar(activePage) {
         customers: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.5"/><path d="M5 20c0-3.5 3-6 7-6s7 2.5 7 6"/></svg>',
         suppliers: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="9" width="13" height="9" rx="1"/><path d="M15 12h4l3 3v3h-7z"/><circle cx="6.5" cy="18.5" r="1.5"/><circle cx="17.5" cy="18.5" r="1.5"/></svg>',
         expenses: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17 9V7a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-2"/><path d="M13 12h8l-2.5-2.5M21 12l-2.5 2.5"/></svg>',
+        reports: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19h16"/><rect x="6" y="12" width="3" height="7"/><rect x="11" y="8" width="3" height="11"/><rect x="16" y="4" width="3" height="15"/></svg>',
         settings: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>',
         chevron: '<svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>',
     };
@@ -51,6 +53,7 @@ function renderSidebar(activePage) {
     const itemsOpen = ['items-register', 'items-list', 'categories', 'units', 'stock-manager'].includes(activePage);
     const purchaseOpen = activePage === 'purchase-add' || activePage === 'purchase-list';
     const posOpen = activePage === 'pos-terminal' || activePage === 'invoice';
+    const reportsOpen = ['sales-report', 'purchase-report', 'expense-report', 'stock-report'].includes(activePage);
 
     const html = `
     <nav class="sidebar">
@@ -120,6 +123,18 @@ function renderSidebar(activePage) {
         </div>
 
         <div class="nav-item">
+            <div class="nav-link" id="reportsToggle">
+                ${icons.reports}<span>Reports</span>${icons.chevron}
+            </div>
+            <div class="nav-sublist ${reportsOpen ? 'open' : ''}" id="reportsSublist">
+                <a class="nav-sublink ${activePage === 'sales-report' ? 'active' : ''}" href="sales-report.html">Sales Report</a>
+                <a class="nav-sublink ${activePage === 'purchase-report' ? 'active' : ''}" href="purchase-report.html">Purchase Report</a>
+                <a class="nav-sublink ${activePage === 'expense-report' ? 'active' : ''}" href="expense-report.html">Expense Report</a>
+                <a class="nav-sublink ${activePage === 'stock-report' ? 'active' : ''}" href="stock-report.html">Stock Report</a>
+            </div>
+        </div>
+
+        <div class="nav-item">
             <a class="nav-link ${activePage === 'settings' ? 'active' : ''}" href="settings.html">
                 ${icons.settings}<span>Settings</span>
             </a>
@@ -133,6 +148,7 @@ function renderSidebar(activePage) {
         { toggleId: 'itemsToggle', sublistId: 'itemsSublist', open: itemsOpen },
         { toggleId: 'purchaseToggle', sublistId: 'purchaseSublist', open: purchaseOpen },
         { toggleId: 'posToggle', sublistId: 'posSublist', open: posOpen },
+        { toggleId: 'reportsToggle', sublistId: 'reportsSublist', open: reportsOpen },
     ].forEach(({ toggleId, sublistId, open }) => {
         const toggle = document.getElementById(toggleId);
         const sublist = document.getElementById(sublistId);
@@ -148,21 +164,6 @@ function renderSidebar(activePage) {
     applySidebarLogo();
 }
 
-// Replaces the default amber-diamond brand mark with the uploaded business
-// logo, if one has been saved in Settings -> Site Settings.
-async function applySidebarLogo() {
-    try {
-        const site = await api('/settings/site');
-        if (!site.logo_data) return;
-        const sizeMap = { small: '22px', medium: '30px', large: '40px' };
-        const brand = document.getElementById('sidebarBrand');
-        if (brand) {
-            brand.innerHTML = `<img src="${site.logo_data}" style="height:${sizeMap[site.logo_size] || '30px'}; border-radius:4px;"> POS Batch System`;
-        }
-    } catch (err) {
-        // Non-fatal - just keep the default brand mark if this fails
-    }
-}
 // Wraps the page's existing <main class="content"> in a .main-area and
 // prepends an edge-to-edge navy topbar above it - one shell shared by every
 // page, so the title bar looks and behaves identically everywhere.
@@ -170,7 +171,6 @@ function buildTopbar(activePage) {
     const content = document.querySelector('.app > .content');
     if (!content) return;
 
-    // Page title comes straight from <title>, e.g. "Sales - POS Batch System" -> "Sales"
     const pageTitle = document.title.split(' - ')[0];
 
     const mainArea = document.createElement('div');
@@ -202,5 +202,23 @@ function buildTopbar(activePage) {
 }
 
 function handleLogout() {
-    toast('Logout coming soon');
+    sessionStorage.removeItem('loggedIn');
+    sessionStorage.removeItem('role');
+    window.location.href = 'login.html';
+}
+
+// Replaces the default amber-diamond brand mark with the uploaded business
+// logo, if one has been saved in Settings -> Site Settings.
+async function applySidebarLogo() {
+    try {
+        const site = await api('/settings/site');
+        if (!site.logo_data) return;
+        const sizeMap = { small: '22px', medium: '30px', large: '40px' };
+        const brand = document.getElementById('sidebarBrand');
+        if (brand) {
+            brand.innerHTML = `<img src="${site.logo_data}" style="height:${sizeMap[site.logo_size] || '30px'}; border-radius:4px;"> POS Batch System`;
+        }
+    } catch (err) {
+        // Non-fatal - just keep the default brand mark if this fails
+    }
 }
