@@ -90,7 +90,7 @@ router.get('/:id', async (req, res) => {
 // CREATE a sale (checkout). Body shape:
 // {
 //   invoice_no: "INV-1001",     // optional - auto-generated if blank (POS Terminal does this)
-//   customer_name: "Jane Doe",  // optional - defaults to "Walk-in Customer"
+//   customer_name: "Jane Doe",  // optional - defaults to "Walk-in"
 //   payments: [                 // preferred - supports split payment across methods
 //     { method: "cash", amount: 200 },
 //     { method: "mpesa", amount: 300 }
@@ -163,7 +163,7 @@ router.post('/', async (req, res) => {
         const saleResult = await client.query(
             `INSERT INTO sales (invoice_no, customer_name, amount_paid, total, status, created_by)
              VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
-            [invoice_no, (customer_name && customer_name.trim()) || 'Walk-in Customer', amountPaid, total, status, 'Admin']
+            [invoice_no, (customer_name && customer_name.trim()) || 'Walk-in', amountPaid, total, status, 'Admin']
         );
         const sale = saleResult.rows[0];
 
