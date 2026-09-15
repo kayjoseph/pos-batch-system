@@ -92,7 +92,7 @@ function renderSales(list) {
                 ${dateObj.toLocaleDateString()}<br>
                 <span style="color:var(--text-muted); font-size:11.5px;">${dateObj.toLocaleTimeString()}</span>
             </td>
-            <td>${s.customer_name || 'Walk-in Customer'}</td>
+            <td>${s.customer_name || 'Walk-in'}</td>
             <td class="mono">${s.total}</td>
             <td class="mono">${s.amount_paid}</td>
             <td class="mono">${balance}</td>
