@@ -64,7 +64,7 @@ async function load() {
         document.getElementById('docDate').textContent = new Date(sale.sale_date).toLocaleString();
         document.getElementById('statusBadge').textContent = sale.status;
         document.getElementById('statusBadge').className = `badge ${sale.status}`;
-        document.getElementById('metaCustomer').textContent = sale.customer_name || 'Walk-in Customer';
+        document.getElementById('metaCustomer').textContent = sale.customer_name || 'Walk-in';
         document.getElementById('metaInvoice').textContent = sale.invoice_no;
         document.getElementById('metaCreatedBy').textContent = sale.created_by || '-';
         document.getElementById('metaPayments').textContent = sale.payments.length
