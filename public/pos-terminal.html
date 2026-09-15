@@ -15,7 +15,7 @@
                 <div class="date" id="todayDate"></div>
                 <div class="pos-customer">
                     <label style="font-size:13px; color:var(--text-muted);">Customer</label>
-                    <input id="customerName" value="Walk-in Customer">
+                    <input id="customerName" value="Walk-in">
                 </div>
             </div>
             <div class="pos-tiles-wrap">
@@ -321,7 +321,7 @@ async function completeSale() {
     const cash = Number(document.getElementById('payCash').value) || 0;
     const mpesa = Number(document.getElementById('payMpesa').value) || 0;
     const bank = Number(document.getElementById('payBank').value) || 0;
-    const customer_name = document.getElementById('customerName').value.trim() || 'Walk-in Customer';
+    const customer_name = document.getElementById('customerName').value.trim() || 'Walk-in';
 
     const payments = [];
     if (cash > 0) payments.push({ method: 'cash', amount: cash });
@@ -341,7 +341,7 @@ async function completeSale() {
         activeCartKey = null;
         renderCart();
         closePayment();
-        document.getElementById('customerName').value = 'Walk-in Customer';
+        document.getElementById('customerName').value = 'Walk-in';
         init(); // refresh tiles - stock levels changed
     } catch (err) {
         toast(err.message);
