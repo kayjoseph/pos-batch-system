@@ -116,15 +116,36 @@ function renderPurchases(list) {
             <td><span class="badge ${p.payment_status}">${p.payment_status}</span></td>
             <td>${p.created_by || '-'}</td>
             <td>
-                <button class="secondary" onclick="location.href='purchase-view.html?id=${p.purchase_id}'">View</button>
-                ${p.status === 'lpo' ? `<button onclick="receiveStock(${p.purchase_id})">Receive Stock</button>` : ''}
-                ${p.payment_status !== 'paid' ? `<button onclick="openPayModal(${p.purchase_id}, ${p.balance})">Pay Now</button>` : ''}
+                <div class="action-menu-wrap">
+                    <button class="secondary" onclick="toggleActionMenu(${p.purchase_id})">Action &#9662;</button>
+                    <div class="action-menu" id="action-menu-${p.purchase_id}">
+                        <div class="action-menu-item" onclick="location.href='purchase-view.html?id=${p.purchase_id}'">View</div>
+                        ${p.status === 'lpo' ? `<div class="action-menu-item" onclick="receiveStock(${p.purchase_id})">Receive Stock</div>` : ''}
+                        ${p.payment_status !== 'paid' ? `<div class="action-menu-item" onclick="openPayModal(${p.purchase_id}, ${p.balance})">Pay Now</div>` : ''}
+                    </div>
+                </div>
             </td>
         </tr>
     `).join('');
 }
 
+function toggleActionMenu(id) {
+    const menu = document.getElementById(`action-menu-${id}`);
+    const isOpen = menu.classList.contains('open');
+    document.querySelectorAll('.action-menu.open').forEach(m => m.classList.remove('open'));
+    if (!isOpen) menu.classList.add('open');
+}
+
+function closeAllActionMenus() {
+    document.querySelectorAll('.action-menu.open').forEach(m => m.classList.remove('open'));
+}
+
+document.addEventListener('click', (e) => {
+    if (!e.target.closest('.action-menu-wrap')) closeAllActionMenus();
+});
+
 async function receiveStock(id) {
+    closeAllActionMenus();
     if (!confirm('Mark this purchase as received? This will create stock batches for every ordered line.')) return;
     try {
         await api(`/purchases/${id}/receive`, { method: 'POST' });
@@ -136,6 +157,7 @@ async function receiveStock(id) {
 }
 
 function openPayModal(id, balance) {
+    closeAllActionMenus();
     payTargetId = id;
     document.getElementById('payBalance').textContent = balance;
     document.getElementById('payAmount').value = balance;
