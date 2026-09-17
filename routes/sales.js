@@ -102,7 +102,7 @@ router.get('/:id', async (req, res) => {
 //   ]
 // }
 router.post('/', async (req, res) => {
-    const { customer_name, payments, amount_paid: legacyAmountPaid = 0, cart } = req.body;
+    const { customer_name, payments, amount_paid: legacyAmountPaid = 0, cart, sale_date } = req.body;
     let { invoice_no } = req.body;
 
     if (!Array.isArray(cart) || cart.length === 0) {
@@ -161,9 +161,9 @@ router.post('/', async (req, res) => {
         const status = amountPaid >= total && total > 0 ? 'paid' : (amountPaid > 0 ? 'partial' : 'unpaid');
 
         const saleResult = await client.query(
-            `INSERT INTO sales (invoice_no, customer_name, amount_paid, total, status, created_by)
-             VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
-            [invoice_no, (customer_name && customer_name.trim()) || 'Walk-in', amountPaid, total, status, 'Admin']
+            `INSERT INTO sales (invoice_no, customer_name, amount_paid, total, status, created_by, sale_date)
+             VALUES ($1, $2, $3, $4, $5, $6, COALESCE($7, NOW())) RETURNING *`,
+            [invoice_no, (customer_name && customer_name.trim()) || 'Walk-in', amountPaid, total, status, 'Admin', sale_date || null]
         );
         const sale = saleResult.rows[0];
 
