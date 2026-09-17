@@ -190,6 +190,15 @@ input:focus, select:focus { outline: 2px solid var(--accent); outline-offset: -1
     padding: 14px 20px; border-bottom: 1px solid var(--border); background: var(--card);
 }
 .pos-topbar .date { font-size: 13px; color: var(--text-muted); }
+.pos-dashboard-btn {
+    display: flex; align-items: center; gap: 7px;
+    padding: 8px 14px; border-radius: 6px;
+    background: var(--sidebar-bg); color: #fff;
+    font-size: 13px; font-weight: 600; text-decoration: none;
+    flex-shrink: 0;
+}
+.pos-dashboard-btn:hover { background: var(--sidebar-bg-hover); }
+.pos-dashboard-btn svg { width: 16px; height: 16px; }
 .pos-customer { display: flex; align-items: center; gap: 8px; }
 .pos-customer input { width: 200px; }
 
