@@ -7,20 +7,29 @@
 </head>
 <body>
 <div class="app">
-    <div id="sidebarMount"></div>
-
     <div class="pos-shell" style="flex:1;">
         <div class="pos-main">
             <div class="pos-topbar">
-                <div class="date" id="todayDate"></div>
+                <a href="dashboard.html" class="pos-dashboard-btn" title="Back to Dashboard">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="8" height="8" rx="1"/><rect x="13" y="3" width="8" height="5" rx="1"/><rect x="13" y="10" width="8" height="11" rx="1"/><rect x="3" y="13" width="8" height="8" rx="1"/></svg>
+                    <span>Dashboard</span>
+                </a>
+                <input type="date" id="saleDate">
                 <div class="pos-customer">
                     <label style="font-size:13px; color:var(--text-muted);">Customer</label>
-                    <input id="customerName" value="Walk-in">
+                    <select id="customerName"></select>
                 </div>
             </div>
             <div class="pos-tiles-wrap">
-                <div class="pos-search">
-                    <input id="itemSearch" placeholder="Search by item name or barcode/SKU..." oninput="renderTiles()">
+                <div class="pos-search" style="display:flex; gap:10px; align-items:flex-start;">
+                    <div class="item-search-wrap" style="flex:1;">
+                        <input id="itemSearch" placeholder="Search by item name or barcode/SKU..." autocomplete="off"
+                               oninput="renderSearchSuggestions()" onkeydown="if(event.key==='Enter'){event.preventDefault(); quickSelectTopMatch();}">
+                        <div class="item-search-results" id="searchResults" style="display:none;"></div>
+                    </div>
+                    <select id="categoryFilter" onchange="renderTiles()" style="min-width:160px;">
+                        <option value="">All Categories</option>
+                    </select>
                 </div>
                 <div class="tile-grid" id="tileGrid"></div>
             </div>
@@ -83,31 +92,41 @@
 <div id="toast"></div>
 <script src="js/common.js"></script>
 <script>
-renderSidebar('pos-terminal');
-
-document.getElementById('todayDate').textContent = new Date().toLocaleDateString(undefined, {
-    weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
-});
+document.getElementById('saleDate').value = new Date().toISOString().substring(0, 10);
 
 let items = [];
+let categories = [];
+let customers = [];
+let currentSearchMatches = [];
 let cart = []; // { cart_key, item_id, item_name, qty, mode, batch_id, batch_ref_no, unit_price }
 let cartKeyCounter = 0;
 let activeCartKey = null;
 
 async function init() {
-    items = await api('/items');
+    [items, categories, customers] = await Promise.all([
+        api('/items'),
+        api('/categories'),
+        api('/customers'),
+    ]);
+
+    document.getElementById('categoryFilter').innerHTML = '<option value="">All Categories</option>' +
+        categories.map(c => `<option value="${c.category_id}">${c.name}</option>`).join('');
+
+    const walkIn = customers.find(c => c.is_default) || customers.find(c => c.name === 'Walk-in');
+    document.getElementById('customerName').innerHTML = customers.map(c =>
+        `<option value="${c.name}" ${walkIn && c.customer_id === walkIn.customer_id ? 'selected' : ''}>${c.name}</option>`
+    ).join('');
+
     renderTiles();
 }
 
 function renderTiles() {
-    const query = document.getElementById('itemSearch').value.trim().toLowerCase();
-    const filtered = !query ? items : items.filter(i =>
-        i.name.toLowerCase().includes(query) || (i.sku && i.sku.toLowerCase().includes(query))
-    );
+    const categoryId = document.getElementById('categoryFilter').value;
+    const filtered = !categoryId ? items : items.filter(i => String(i.category_id) === categoryId);
 
     const grid = document.getElementById('tileGrid');
     if (filtered.length === 0) {
-        grid.innerHTML = `<div class="empty-state">No items match "${query}"</div>`;
+        grid.innerHTML = `<div class="empty-state">No items in this category</div>`;
         return;
     }
     grid.innerHTML = filtered.map(item => {
@@ -122,6 +141,52 @@ function renderTiles() {
         </div>`;
     }).join('');
 }
+
+// Search no longer hides other tiles - it shows a dropdown of matches below
+// the search box (same pattern as Invoice Entry) so the full grid stays
+// browsable while a specific item can still be picked quickly.
+function matchItems(query) {
+    const q = query.trim().toLowerCase();
+    if (!q) return [];
+    return items.filter(i => i.name.toLowerCase().includes(q) || (i.sku && i.sku.toLowerCase().includes(q)));
+}
+
+function renderSearchSuggestions() {
+    const query = document.getElementById('itemSearch').value;
+    currentSearchMatches = matchItems(query);
+    const box = document.getElementById('searchResults');
+
+    if (!query.trim()) { box.style.display = 'none'; return; }
+
+    if (currentSearchMatches.length === 0) {
+        box.innerHTML = `<div class="item-search-not-found">Item not found</div>`;
+    } else {
+        box.innerHTML = currentSearchMatches.map(i => `
+            <div class="item-search-row" onclick="selectSearchedItem(${i.item_id})">
+                ${i.name} <span class="stock-hint">${i.sku ? '(' + i.sku + ')' : ''} - Qty: ${i.total_stock}</span>
+            </div>
+        `).join('');
+    }
+    box.style.display = 'block';
+}
+
+function selectSearchedItem(itemId) {
+    document.getElementById('searchResults').style.display = 'none';
+    document.getElementById('itemSearch').value = '';
+    tileClicked(itemId);
+}
+
+function quickSelectTopMatch() {
+    if (currentSearchMatches.length === 0) return toast('Item not found');
+    selectSearchedItem(currentSearchMatches[0].item_id);
+}
+
+document.addEventListener('click', (e) => {
+    const wrap = document.querySelector('.item-search-wrap');
+    if (wrap && !wrap.contains(e.target)) {
+        document.getElementById('searchResults').style.display = 'none';
+    }
+});
 
 // Walks the available batches for an item oldest-first (same order the
 // backend's FIFO allocator uses) and totals the cost for the requested qty,
@@ -321,7 +386,15 @@ async function completeSale() {
     const cash = Number(document.getElementById('payCash').value) || 0;
     const mpesa = Number(document.getElementById('payMpesa').value) || 0;
     const bank = Number(document.getElementById('payBank').value) || 0;
-    const customer_name = document.getElementById('customerName').value.trim() || 'Walk-in';
+    const customer_name = document.getElementById('customerName').value || 'Walk-in';
+    const chosenDate = document.getElementById('saleDate').value; // YYYY-MM-DD
+
+    // Combine the chosen date with the current time, so a backdated sale still
+    // records a real time-of-entry rather than defaulting to midnight.
+    const now = new Date();
+    const sale_date = chosenDate
+        ? `${chosenDate}T${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}:${String(now.getSeconds()).padStart(2,'0')}`
+        : undefined;
 
     const payments = [];
     if (cash > 0) payments.push({ method: 'cash', amount: cash });
@@ -331,6 +404,7 @@ async function completeSale() {
     const payload = {
         customer_name,
         payments,
+        sale_date,
         cart: cart.map(l => ({ item_id: l.item_id, qty: l.qty, mode: l.mode, batch_id: l.batch_id })),
     };
 
@@ -341,12 +415,13 @@ async function completeSale() {
         activeCartKey = null;
         renderCart();
         closePayment();
-        document.getElementById('customerName').value = 'Walk-in';
-        init(); // refresh tiles - stock levels changed
+        document.getElementById('saleDate').value = new Date().toISOString().substring(0, 10);
+        init(); // refresh tiles, categories, customers - stock levels changed
     } catch (err) {
         toast(err.message);
     }
 }
+
 
 init();
 renderCart();
