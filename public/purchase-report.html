@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Purchase Report - POS Batch System</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="app">
+    <div id="sidebarMount"></div>
+    <main class="content">
+
+        <div class="list-filter-bar">
+            <div class="field">
+                <label>Report Type</label>
+                <select id="reportType" onchange="runReport()"></select>
+            </div>
+            <div class="field" id="dateRangeFields" style="display:contents;">
+                <div class="field">
+                    <label>From</label>
+                    <input type="date" id="reportFrom" onchange="runReport()">
+                </div>
+                <div class="field">
+                    <label>To</label>
+                    <input type="date" id="reportTo" onchange="runReport()">
+                </div>
+            </div>
+            <button onclick="runReport()">Run</button>
+            <button class="secondary" onclick="printReport()">Print</button>
+        </div>
+
+        <table>
+            <thead id="reportHead"></thead>
+            <tbody id="reportBody"></tbody>
+            <tfoot id="reportFoot"></tfoot>
+        </table>
+
+    </main>
+</div>
+<div id="toast"></div>
+<script src="js/common.js"></script>
+<script src="js/report.js"></script>
+<script>
+renderSidebar('purchase-report');
+
+initReport({
+    endpoint: '/reports/purchases',
+    types: [
+        { value: 'summary', label: 'Daily Summary' },
+        { value: 'detailed', label: 'Detailed (every purchase)' },
+        { value: 'by-supplier', label: 'By Supplier' },
+        { value: 'by-item', label: 'By Item' },
+        { value: 'outstanding', label: 'Outstanding Balances' },
+        { value: 'pending-lpo', label: 'Pending LPOs' },
+    ],
+});
+</script>
+</body>
+</html>
