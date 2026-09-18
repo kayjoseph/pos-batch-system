@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Expense Report - POS Batch System</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="app">
+    <div id="sidebarMount"></div>
+    <main class="content">
+
+        <div class="list-filter-bar">
+            <div class="field">
+                <label>Report Type</label>
+                <select id="reportType" onchange="runReport()"></select>
+            </div>
+            <div class="field" id="dateRangeFields" style="display:contents;">
+                <div class="field">
+                    <label>From</label>
+                    <input type="date" id="reportFrom" onchange="runReport()">
+                </div>
+                <div class="field">
+                    <label>To</label>
+                    <input type="date" id="reportTo" onchange="runReport()">
+                </div>
+            </div>
+            <button onclick="runReport()">Run</button>
+            <button class="secondary" onclick="printReport()">Print</button>
+        </div>
+
+        <table>
+            <thead id="reportHead"></thead>
+            <tbody id="reportBody"></tbody>
+            <tfoot id="reportFoot"></tfoot>
+        </table>
+
+    </main>
+</div>
+<div id="toast"></div>
+<script src="js/common.js"></script>
+<script src="js/report.js"></script>
+<script>
+renderSidebar('expense-report');
+
+initReport({
+    endpoint: '/reports/expenses',
+    types: [
+        { value: 'by-category', label: 'By Category' },
+        { value: 'daily', label: 'Daily Summary' },
+        { value: 'by-payment-method', label: 'By Payment Method' },
+        { value: 'detailed', label: 'Detailed (every expense)' },
+    ],
+});
+</script>
+</body>
+</html>
