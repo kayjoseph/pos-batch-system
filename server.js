@@ -15,6 +15,7 @@ const expensesRouter = require('./routes/expenses');
 const dashboardRouter = require('./routes/dashboard');
 const settingsRouter = require('./routes/settings');
 const authRouter = require('./routes/auth');
+const reportsRouter = require('./routes/reports');
 
 const app = express();
 
@@ -34,6 +35,7 @@ app.use('/api/expenses', expensesRouter);
 app.use('/api/dashboard', dashboardRouter);
 app.use('/api/settings', settingsRouter);
 app.use('/api/auth', authRouter);
+app.use('/api/reports', reportsRouter);
 
 app.get('/health', (req, res) => res.json({ status: 'ok' }));
 
