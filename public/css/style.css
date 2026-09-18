@@ -420,10 +420,6 @@ input.invalid-input { border-color: var(--danger); }
 .header-btn-secondary:hover { background: rgba(255,255,255,0.16); }
 
 
-
-
-
-
 /* ============ Print (used by the Reports "Print" button) ============ */
 #printHeader { display: none; }
 
