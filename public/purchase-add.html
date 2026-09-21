@@ -13,26 +13,21 @@
         <div class="card">
             <div class="form-row" style="align-items:flex-start;">
                 <label>Supplier</label>
-                <div class="item-search-wrap" style="min-width:220px;">
+                <div class="item-search-wrap" style="min-width:200px;">
                     <input id="supplierSearch" placeholder="Search registered supplier..." autocomplete="off"
                            oninput="renderSupplierResults()">
                     <div class="item-search-results" id="supplierResults" style="display:none;"></div>
                 </div>
-                <label style="width:auto; margin-left:4px;">Phone</label>
-                <input id="supplierPhone" readonly placeholder="-" style="width:130px; background:var(--canvas);">
+                <label style="width:auto; margin-left:4px;">Status</label>
+                <select id="status" style="width:auto;">
+                    <option value="received">Received</option>
+                    <option value="lpo">LPO (Order)</option>
+                </select>
+                <label style="width:auto; margin-left:4px;">Ref No.</label>
+                <input id="supplierRefNo" placeholder="supplier's own ref no. (optional)" style="flex:1; min-width:140px;">
             </div>
             <div class="form-row">
                 <label>Purchase Date</label><input type="date" id="purchaseDate" style="width:160px;">
-            </div>
-            <div class="form-row">
-                <label>Ref No.</label><input id="supplierRefNo" placeholder="optional - supplier's own delivery/invoice no." style="flex:1;">
-            </div>
-            <div class="form-row">
-                <label>Status</label>
-                <select id="status">
-                    <option value="received">Received - stock updates now</option>
-                    <option value="lpo">LPO (Order) - stock updates once received</option>
-                </select>
             </div>
         </div>
 
@@ -95,12 +90,13 @@ function renderSupplierResults() {
     const query = input.value.trim().toLowerCase();
     const box = document.getElementById('supplierResults');
     input.dataset.supplierId = ''; // typing invalidates any previously selected supplier
-    document.getElementById('supplierPhone').value = '';
 
     if (!query) { box.style.display = 'none'; return; }
 
     const matches = suppliers.filter(s =>
-        s.name.toLowerCase().includes(query) || (s.supplier_code && s.supplier_code.toLowerCase().includes(query))
+        s.name.toLowerCase().includes(query) ||
+        (s.supplier_code && s.supplier_code.toLowerCase().includes(query)) ||
+        (s.phone && s.phone.toLowerCase().includes(query))
     );
 
     if (matches.length === 0) {
@@ -121,7 +117,6 @@ function selectSupplier(supplierId) {
     const input = document.getElementById('supplierSearch');
     input.value = supplier.name;
     input.dataset.supplierId = supplierId;
-    document.getElementById('supplierPhone').value = supplier.phone || '';
     document.getElementById('supplierResults').style.display = 'none';
 }
 
