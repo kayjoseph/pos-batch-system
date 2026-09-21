@@ -89,7 +89,7 @@ router.get('/:id', async (req, res) => {
 // status "lpo" only records the order - no batches, no stock change, until
 // "Receive Stock" is called later.
 router.post('/', async (req, res) => {
-    const { supplier, status = 'received', amount_paid = 0, payment_method = null, lines } = req.body;
+    const { supplier_id, status = 'received', amount_paid = 0, payment_method = null, lines, purchase_date, supplier_ref_no } = req.body;
     if (!Array.isArray(lines) || lines.length === 0) {
         return res.status(400).json({ error: 'At least one purchase line is required' });
     }
@@ -112,10 +112,25 @@ router.post('/', async (req, res) => {
         const paymentStatus = computePaymentStatus(amount_paid, total);
         const purchaseInvoiceNo = await generateNextPurchaseInvoiceNo(client);
 
+        // Resolve the supplier - falls back to the default General Supplier
+        // if none was given, so every purchase always has a real link.
+        let resolvedSupplierId = supplier_id || null;
+        let supplierName;
+        if (resolvedSupplierId) {
+            const supplierResult = await client.query('SELECT name FROM suppliers WHERE supplier_id = $1', [resolvedSupplierId]);
+            if (supplierResult.rows.length === 0) throw new Error('Selected supplier not found');
+            supplierName = supplierResult.rows[0].name;
+        } else {
+            const general = await client.query('SELECT supplier_id, name FROM suppliers WHERE is_default = true LIMIT 1');
+            if (general.rows.length === 0) throw new Error('No default General Supplier configured');
+            resolvedSupplierId = general.rows[0].supplier_id;
+            supplierName = general.rows[0].name;
+        }
+
         const purchaseResult = await client.query(
-            `INSERT INTO purchases (purchase_invoice_no, supplier, status, subtotal, total, amount_paid, payment_method, payment_status, created_by)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
-            [purchaseInvoiceNo, (supplier && supplier.trim()) || 'General Supplier', status, subtotal, total, amount_paid, payment_method, paymentStatus, 'Admin']
+            `INSERT INTO purchases (purchase_invoice_no, supplier_id, supplier, supplier_ref_no, status, subtotal, total, amount_paid, payment_method, payment_status, created_by, purchase_date)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, COALESCE($12, NOW())) RETURNING *`,
+            [purchaseInvoiceNo, resolvedSupplierId, supplierName, (supplier_ref_no && supplier_ref_no.trim()) || null, status, subtotal, total, amount_paid, payment_method, paymentStatus, 'Admin', purchase_date || null]
         );
         const purchase = purchaseResult.rows[0];
 
