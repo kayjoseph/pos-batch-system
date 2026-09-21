@@ -11,8 +11,21 @@
     <main class="content">
 
         <div class="card">
+            <div class="form-row" style="align-items:flex-start;">
+                <label>Supplier</label>
+                <div class="item-search-wrap" style="min-width:220px;">
+                    <input id="supplierSearch" placeholder="Search registered supplier..." autocomplete="off"
+                           oninput="renderSupplierResults()">
+                    <div class="item-search-results" id="supplierResults" style="display:none;"></div>
+                </div>
+                <label style="width:auto; margin-left:4px;">Phone</label>
+                <input id="supplierPhone" readonly placeholder="-" style="width:130px; background:var(--canvas);">
+            </div>
             <div class="form-row">
-                <label>Supplier</label><input id="supplier" value="General Supplier" style="flex:1;">
+                <label>Purchase Date</label><input type="date" id="purchaseDate" style="width:160px;">
+            </div>
+            <div class="form-row">
+                <label>Ref No.</label><input id="supplierRefNo" placeholder="optional - supplier's own delivery/invoice no." style="flex:1;">
             </div>
             <div class="form-row">
                 <label>Status</label>
@@ -65,11 +78,51 @@
 renderSidebar('purchase-add');
 
 let items = [];
+let suppliers = [];
 let lineCount = 0;
 
 async function init() {
-    items = await api('/items');
-    // No default line - purely opt-in via "+ Add Line", per the requested change.
+    [items, suppliers] = await Promise.all([api('/items'), api('/suppliers')]);
+    document.getElementById('purchaseDate').value = new Date().toISOString().substring(0, 10);
+
+    // Prefill with the default General Supplier so the form is valid as-is
+    const defaultSupplier = suppliers.find(s => s.is_default) || suppliers[0];
+    if (defaultSupplier) selectSupplier(defaultSupplier.supplier_id);
+}
+
+function renderSupplierResults() {
+    const input = document.getElementById('supplierSearch');
+    const query = input.value.trim().toLowerCase();
+    const box = document.getElementById('supplierResults');
+    input.dataset.supplierId = ''; // typing invalidates any previously selected supplier
+    document.getElementById('supplierPhone').value = '';
+
+    if (!query) { box.style.display = 'none'; return; }
+
+    const matches = suppliers.filter(s =>
+        s.name.toLowerCase().includes(query) || (s.supplier_code && s.supplier_code.toLowerCase().includes(query))
+    );
+
+    if (matches.length === 0) {
+        box.innerHTML = `<div class="item-search-not-found">Supplier not found</div>`;
+    } else {
+        box.innerHTML = matches.map(s => `
+            <div class="item-search-row" onclick="selectSupplier(${s.supplier_id})">
+                ${s.name} <span class="stock-hint">${s.supplier_code ? '(' + s.supplier_code + ')' : ''}${s.phone ? ' - ' + s.phone : ''}</span>
+            </div>
+        `).join('');
+    }
+    box.style.display = 'block';
+}
+
+function selectSupplier(supplierId) {
+    const supplier = suppliers.find(s => s.supplier_id === supplierId);
+    if (!supplier) return;
+    const input = document.getElementById('supplierSearch');
+    input.value = supplier.name;
+    input.dataset.supplierId = supplierId;
+    document.getElementById('supplierPhone').value = supplier.phone || '';
+    document.getElementById('supplierResults').style.display = 'none';
 }
 
 function addLine() {
@@ -82,16 +135,16 @@ function addLine() {
     row.innerHTML = `
         <td>
             <div class="item-search-wrap" style="min-width:160px;">
-                <input id="item-search-${id}" placeholder="Search item..." autocomplete="off"
+                <input id="item-search-${id}" placeholder="Search item by name, SKU or code..." autocomplete="off"
                        oninput="renderLineSearchResults(${id})">
                 <div class="item-search-results" id="item-results-${id}" style="display:none;"></div>
             </div>
         </td>
-        <td><input type="number" id="qty-${id}" style="width:70px" value="1" oninput="recalc()"></td>
-        <td><input type="number" step="0.01" id="cost-${id}" style="width:90px" value="0" oninput="recalc()"></td>
-        <td><input type="number" step="0.01" id="sp-${id}" style="width:90px" value="0"></td>
-        <td><input id="ref-${id}" placeholder="auto if blank" style="width:110px"></td>
-        <td><input type="date" id="exp-${id}"></td>
+        <td><input type="number" id="qty-${id}" style="width:70px" value="1" disabled oninput="recalc()"></td>
+        <td><input type="number" step="0.01" id="cost-${id}" style="width:90px" value="0" disabled oninput="recalc()"></td>
+        <td><input type="number" step="0.01" id="sp-${id}" style="width:90px" value="0" disabled></td>
+        <td><input id="ref-${id}" placeholder="auto if blank" style="width:110px" disabled></td>
+        <td><input type="date" id="exp-${id}" disabled></td>
         <td><button class="danger" onclick="removeLine(${id})">X</button></td>
     `;
     document.getElementById('linesBody').prepend(row);
@@ -103,11 +156,14 @@ function renderLineSearchResults(id) {
     const query = input.value.trim().toLowerCase();
     const box = document.getElementById(`item-results-${id}`);
     input.dataset.itemId = ''; // typing invalidates any previously selected item
+    setLineFieldsEnabled(id, false);
 
     if (!query) { box.style.display = 'none'; return; }
 
     const matches = items.filter(i =>
-        i.name.toLowerCase().includes(query) || (i.sku && i.sku.toLowerCase().includes(query))
+        i.name.toLowerCase().includes(query) ||
+        (i.sku && i.sku.toLowerCase().includes(query)) ||
+        (i.item_code && i.item_code.toLowerCase().includes(query))
     );
 
     if (matches.length === 0) {
@@ -115,11 +171,17 @@ function renderLineSearchResults(id) {
     } else {
         box.innerHTML = matches.map(i => `
             <div class="item-search-row" onclick="selectLineItem(${id}, ${i.item_id})">
-                ${i.name} <span class="stock-hint">${i.sku ? '(' + i.sku + ')' : ''} - Qty: ${i.total_stock}</span>
+                ${i.name} <span class="stock-hint">${i.item_code ? '(' + i.item_code + ')' : ''}${i.sku ? ' - ' + i.sku : ''} - Qty: ${i.total_stock}</span>
             </div>
         `).join('');
     }
     box.style.display = 'block';
+}
+
+function setLineFieldsEnabled(id, enabled) {
+    ['qty', 'cost', 'sp', 'ref', 'exp'].forEach(prefix => {
+        document.getElementById(`${prefix}-${id}`).disabled = !enabled;
+    });
 }
 
 function selectLineItem(id, itemId) {
@@ -128,6 +190,8 @@ function selectLineItem(id, itemId) {
     input.value = item.name;
     input.dataset.itemId = itemId;
     document.getElementById(`item-results-${id}`).style.display = 'none';
+    // Now that an item is picked, qty/cost/price/etc become editable
+    setLineFieldsEnabled(id, true);
 }
 
 function removeLine(id) {
@@ -152,11 +216,15 @@ function recalc() {
 }
 
 async function savePurchase() {
-    const supplier = document.getElementById('supplier').value.trim() || 'General Supplier';
+    const supplierIdRaw = document.getElementById('supplierSearch').dataset.supplierId;
+    const supplier_ref_no = document.getElementById('supplierRefNo').value.trim();
+    const purchase_date = document.getElementById('purchaseDate').value || null;
     const status = document.getElementById('status').value;
     const amount_paid = Number(document.getElementById('amountPaid').value) || 0;
     const paymentMethodValue = document.getElementById('paymentMethod').value;
     const payment_method = paymentMethodValue || null;
+
+    if (!supplierIdRaw) return toast('Pick a supplier from the search results');
 
     const lines = [];
     let hasUnselectedItem = false;
@@ -181,7 +249,15 @@ async function savePurchase() {
     try {
         await api('/purchases', {
             method: 'POST',
-            body: JSON.stringify({ supplier, status, amount_paid, payment_method, lines }),
+            body: JSON.stringify({
+                supplier_id: Number(supplierIdRaw),
+                supplier_ref_no,
+                purchase_date,
+                status,
+                amount_paid,
+                payment_method,
+                lines,
+            }),
         });
         toast(status === 'received' ? 'Purchase saved - stock updated' : 'Purchase order recorded (LPO)');
         window.location.href = 'purchase.html';
