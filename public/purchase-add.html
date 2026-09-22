@@ -23,8 +23,9 @@
                     <option value="received">Received</option>
                     <option value="lpo">LPO (Order)</option>
                 </select>
-                <label style="width:auto; margin-left:4px;">Ref No.</label>
-                <input id="supplierRefNo" placeholder="supplier's own ref no. (optional)" style="flex:1; min-width:140px;">
+            </div>
+            <div class="form-row">
+                <label>Ref No.</label><input id="supplierRefNo" placeholder="supplier's own ref no. (optional)" style="flex:1; min-width:140px;">
             </div>
             <div class="form-row">
                 <label>Purchase Date</label><input type="date" id="purchaseDate" style="width:160px;">
@@ -32,9 +33,12 @@
         </div>
 
         <div class="card">
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-                <h2 class="section-title" style="margin:0;">Purchase Lines</h2>
-                <button class="secondary" onclick="addLine()">+ Add Line</button>
+            <h2 class="section-title" style="margin:0 0 10px 0;">Purchase Lines</h2>
+            <div class="item-search-wrap" style="max-width:440px; margin-bottom:14px;">
+                <input id="itemSearch" placeholder="Search item by name, code or SKU..." autocomplete="off"
+                       oninput="renderItemSearchResults()"
+                       onkeydown="if(event.key==='Enter'){event.preventDefault(); tryQuickAddLine();}">
+                <div class="item-search-results" id="itemSearchResults" style="display:none;"></div>
             </div>
             <table>
                 <thead>
@@ -44,7 +48,7 @@
                     </tr>
                 </thead>
                 <tbody id="linesBody">
-                    <tr id="emptyLinesRow"><td colspan="7"><div class="empty-state">No lines yet - click "+ Add Line" to start.</div></td></tr>
+                    <tr id="emptyLinesRow"><td colspan="7"><div class="empty-state">Search for an item above to add it here.</div></td></tr>
                 </tbody>
             </table>
         </div>
@@ -120,52 +124,25 @@ function selectSupplier(supplierId) {
     document.getElementById('supplierResults').style.display = 'none';
 }
 
-function addLine() {
-    const emptyRow = document.getElementById('emptyLinesRow');
-    if (emptyRow) emptyRow.remove();
+let currentItemMatches = [];
 
-    const id = lineCount++;
-    const row = document.createElement('tr');
-    row.id = `line-${id}`;
-    row.innerHTML = `
-        <td>
-            <div class="item-search-wrap" style="min-width:160px;">
-                <input id="item-search-${id}" placeholder="Search item by name, SKU or code..." autocomplete="off"
-                       oninput="renderLineSearchResults(${id})">
-                <div class="item-search-results" id="item-results-${id}" style="display:none;"></div>
-            </div>
-        </td>
-        <td><input type="number" id="qty-${id}" style="width:70px" value="1" disabled oninput="recalc()"></td>
-        <td><input type="number" step="0.01" id="cost-${id}" style="width:90px" value="0" disabled oninput="recalc()"></td>
-        <td><input type="number" step="0.01" id="sp-${id}" style="width:90px" value="0" disabled></td>
-        <td><input id="ref-${id}" placeholder="auto if blank" style="width:110px" disabled></td>
-        <td><input type="date" id="exp-${id}" disabled></td>
-        <td><button class="danger" onclick="removeLine(${id})">X</button></td>
-    `;
-    document.getElementById('linesBody').prepend(row);
-    recalc();
-}
+function renderItemSearchResults() {
+    const query = document.getElementById('itemSearch').value.trim().toLowerCase();
+    const box = document.getElementById('itemSearchResults');
 
-function renderLineSearchResults(id) {
-    const input = document.getElementById(`item-search-${id}`);
-    const query = input.value.trim().toLowerCase();
-    const box = document.getElementById(`item-results-${id}`);
-    input.dataset.itemId = ''; // typing invalidates any previously selected item
-    setLineFieldsEnabled(id, false);
+    if (!query) { box.style.display = 'none'; currentItemMatches = []; return; }
 
-    if (!query) { box.style.display = 'none'; return; }
-
-    const matches = items.filter(i =>
+    currentItemMatches = items.filter(i =>
         i.name.toLowerCase().includes(query) ||
         (i.sku && i.sku.toLowerCase().includes(query)) ||
         (i.item_code && i.item_code.toLowerCase().includes(query))
     );
 
-    if (matches.length === 0) {
+    if (currentItemMatches.length === 0) {
         box.innerHTML = `<div class="item-search-not-found">Item not found</div>`;
     } else {
-        box.innerHTML = matches.map(i => `
-            <div class="item-search-row" onclick="selectLineItem(${id}, ${i.item_id})">
+        box.innerHTML = currentItemMatches.map(i => `
+            <div class="item-search-row" onclick="addLineForItem(${i.item_id})">
                 ${i.name} <span class="stock-hint">${i.item_code ? '(' + i.item_code + ')' : ''}${i.sku ? ' - ' + i.sku : ''} - Qty: ${i.total_stock}</span>
             </div>
         `).join('');
@@ -173,20 +150,38 @@ function renderLineSearchResults(id) {
     box.style.display = 'block';
 }
 
-function setLineFieldsEnabled(id, enabled) {
-    ['qty', 'cost', 'sp', 'ref', 'exp'].forEach(prefix => {
-        document.getElementById(`${prefix}-${id}`).disabled = !enabled;
-    });
+function tryQuickAddLine() {
+    if (currentItemMatches.length === 0) return toast('Item not found');
+    addLineForItem(currentItemMatches[0].item_id);
 }
 
-function selectLineItem(id, itemId) {
+// Adds the picked item straight into the lines table - no separate "Add Line"
+// step. Qty/cost/etc are immediately editable since the item is already known.
+function addLineForItem(itemId) {
     const item = items.find(i => i.item_id === itemId);
-    const input = document.getElementById(`item-search-${id}`);
-    input.value = item.name;
-    input.dataset.itemId = itemId;
-    document.getElementById(`item-results-${id}`).style.display = 'none';
-    // Now that an item is picked, qty/cost/price/etc become editable
-    setLineFieldsEnabled(id, true);
+
+    document.getElementById('itemSearch').value = '';
+    document.getElementById('itemSearchResults').style.display = 'none';
+    currentItemMatches = [];
+
+    const emptyRow = document.getElementById('emptyLinesRow');
+    if (emptyRow) emptyRow.remove();
+
+    const id = lineCount++;
+    const row = document.createElement('tr');
+    row.id = `line-${id}`;
+    row.dataset.itemId = itemId;
+    row.innerHTML = `
+        <td>${item.name}</td>
+        <td><input type="number" id="qty-${id}" style="width:70px" value="1" oninput="recalc()"></td>
+        <td><input type="number" step="0.01" id="cost-${id}" style="width:90px" value="0" oninput="recalc()"></td>
+        <td><input type="number" step="0.01" id="sp-${id}" style="width:90px" value="0"></td>
+        <td><input id="ref-${id}" placeholder="auto if blank" style="width:110px"></td>
+        <td><input type="date" id="exp-${id}"></td>
+        <td><button class="danger" onclick="removeLine(${id})">X</button></td>
+    `;
+    document.getElementById('linesBody').prepend(row);
+    recalc();
 }
 
 function removeLine(id) {
@@ -194,7 +189,7 @@ function removeLine(id) {
     if (row) row.remove();
     if (document.querySelectorAll('[id^="line-"]').length === 0) {
         document.getElementById('linesBody').innerHTML =
-            '<tr id="emptyLinesRow"><td colspan="7"><div class="empty-state">No lines yet - click "+ Add Line" to start.</div></td></tr>';
+            '<tr id="emptyLinesRow"><td colspan="7"><div class="empty-state">Search for an item above to add it here.</div></td></tr>';
     }
     recalc();
 }
@@ -222,13 +217,10 @@ async function savePurchase() {
     if (!supplierIdRaw) return toast('Pick a supplier from the search results');
 
     const lines = [];
-    let hasUnselectedItem = false;
     document.querySelectorAll('[id^="line-"]').forEach(row => {
         const id = row.id.split('-')[1];
-        const itemIdRaw = document.getElementById(`item-search-${id}`).dataset.itemId;
-        if (!itemIdRaw) { hasUnselectedItem = true; return; }
         lines.push({
-            item_id: Number(itemIdRaw),
+            item_id: Number(row.dataset.itemId),
             qty: Number(document.getElementById(`qty-${id}`).value),
             cost_price: Number(document.getElementById(`cost-${id}`).value),
             selling_price: Number(document.getElementById(`sp-${id}`).value),
@@ -237,8 +229,7 @@ async function savePurchase() {
         });
     });
 
-    if (hasUnselectedItem) return toast('Pick an item from the search results for every line');
-    if (lines.length === 0) return toast('Add at least one line');
+    if (lines.length === 0) return toast('Search for and add at least one item');
     if (amount_paid > 0 && !payment_method) return toast('Select a payment method for the amount paid');
 
     try {
